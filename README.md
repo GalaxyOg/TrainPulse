@@ -32,6 +32,11 @@ pipx install .
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py" -v
 ```
 
+最新一次本地验证（2026-03-31）：
+
+- 命令：`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -v`
+- 结果：`Ran 11 tests ... OK`
+
 ## 快速开始
 
 1) 设置 Webhook（推荐环境变量，不写入仓库）：
