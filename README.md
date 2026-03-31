@@ -160,3 +160,5 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py" -
 - License: MIT（见 `LICENSE`）
 - 贡献方式：见 `CONTRIBUTING.md`
 - 发布建议：见 `RELEASE.md`
+- 安全策略：见 `SECURITY.md`
+- 变更记录：见 `CHANGELOG.md`
