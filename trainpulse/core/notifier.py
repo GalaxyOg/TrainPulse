@@ -5,13 +5,14 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from .timeutil import now_iso
+
 
 def _iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return now_iso()
 
 
 class FeishuNotifier:

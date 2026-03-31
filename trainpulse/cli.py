@@ -7,7 +7,6 @@ import shlex
 import signal
 import sys
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -15,6 +14,7 @@ from trainpulse.core.context import build_run_context, infer_job_name
 from trainpulse.core.notifier import FeishuNotifier
 from trainpulse.core.runner import CommandRunner
 from trainpulse.core.store import RunStore
+from trainpulse.core.timeutil import now_compact
 from trainpulse.integrations.tmux import (
     has_tmux,
     session_exists,
@@ -217,7 +217,7 @@ def _normalize_cmd(cmd: list[str]) -> list[str]:
 
 
 def _generate_run_id() -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    ts = now_compact()
     suffix = uuid.uuid4().hex[:8]
     return f"{ts}-{suffix}"
 

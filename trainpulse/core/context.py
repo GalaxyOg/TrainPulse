@@ -4,15 +4,11 @@ import os
 import shlex
 import socket
 import subprocess
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
 from .redact import redact_text
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from .timeutil import now_iso
 
 
 def _run_git(args: list[str], cwd: Path) -> Optional[str]:

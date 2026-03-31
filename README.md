@@ -6,6 +6,8 @@
 
 支持事件：`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED` / `HEARTBEAT`
 
+时间说明：通知与运行记录默认使用 `UTC+8` 时区输出。
+
 ## ✨ 你会得到什么
 
 - 🚀 一条命令包装训练任务：`run` / `tmux-run` / `status` / `stop`

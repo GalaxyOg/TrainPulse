@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
+from .timeutil import now_iso
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return now_iso()
 
 
 class RunStore:

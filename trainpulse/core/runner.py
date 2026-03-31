@@ -6,17 +6,13 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, TextIO
 
 from .models import Event
 from .notifier import FeishuNotifier
 from .store import RunStore
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from .timeutil import now_iso
 
 
 def determine_final_event(exit_code: int, interrupted: bool) -> Event:
