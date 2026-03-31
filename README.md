@@ -1,92 +1,136 @@
 # Train Notify
 
-跨项目可复用的训练任务通知与监管工具。它可包装任意训练命令，在 `STARTED / SUCCEEDED / FAILED / INTERRUPTED` 时发送飞书 Webhook 通知，并支持 `tmux` 后台运行与多任务并发监管。
+`train-notify` 是一个通用训练任务通知工具：包装任意命令，在任务 `STARTED / SUCCEEDED / FAILED / INTERRUPTED` 时发送飞书 Webhook 通知，并保留原命令退出码。
 
-## 功能概览
+适用于深度学习/强化学习训练，不耦合具体框架。
 
-- 支持任意命令包装（原生命令、`conda run ...`、`uv run ...`、`poetry run ...`、`venv` 均可）
-- 自动识别项目名：优先 `git rev-parse --show-toplevel`，否则当前目录名
-- 统一 CLI：
-  - `train-notify run -- <command...>`
-  - `train-notify tmux-run --session <name> -- <command...>`
-  - `train-notify status`
-  - `train-notify stop --run-id <id>`
-- 飞书消息：`text` 与 `post`（富文本）格式
-- 本地持久化：SQLite 记录任务状态与历史
-- 信号处理：`SIGINT` / `SIGTERM` 转发子进程并发送 `INTERRUPTED`
-- 长任务心跳：支持定时 `HEARTBEAT` 通知
-- 安全：支持 `--redact` 命令脱敏，避免 token/密钥泄漏
-- `--dry-run` 预览消息，不实际发送
+## 核心能力
 
-## 安装
-
-```bash
-pip install .
-# 或
-pipx install .
-```
-
-## 运行测试
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py" -v
-```
-
-最新一次本地验证（2026-03-31）：
-
-- 命令：`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py' -v`
-- 结果：`Ran 11 tests ... OK`
+- 跨仓库自动识别项目名（优先 Git 根目录名，否则当前目录名）
+- 统一命令入口：`run / tmux-run / status / stop`
+- 支持任意执行方式：原生命令、`conda run ...`、`uv run ...`、`poetry run ...`
+- 通知格式：`text` + `post`
+- 失败不吞退出码：任务失败返回码原样透传
+- 支持 `--dry-run`、`--redact`、心跳通知、SQLite 运行记录
 
 ## 快速开始
 
-1) 设置 Webhook（推荐环境变量，不写入仓库）：
-
 ```bash
 export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+train-notify run -- python train.py --config cfg.yaml
 ```
 
-2) 运行训练命令：
+常见场景：
 
 ```bash
-# 原生命令
-train-notify run -- python train.py --config cfg.yaml
-
 # conda
-train-notify run -- conda run -n rlzoo3 python script/run.py --config-name=foo
+train-notify run -- conda run -n rlzoo3 python script/run.py
 
 # uv
 train-notify run -- uv run python train.py
+
+# tmux 后台
+train-notify tmux-run --session exp1 --log-path ./log/train.log -- \
+  python train.py --config cfg.yaml
 ```
 
-3) tmux 后台：
+## 本地安装
+
+要求：Python 3.10+。
 
 ```bash
-train-notify tmux-run --session ffsm_expert --log-path ./log/train.log -- \
-  conda run -n rlzoo3 python -m rl_zoo3.train --algo sac --env FFSMEnv6dof-v0
+# 在仓库根目录
+python3 -m pip install -e .
+# 或隔离安装
+pipx install .
 ```
 
-4) 查看状态与停止：
+安装后验证：
 
 ```bash
-train-notify status
-train-notify stop --run-id 20260331-120001-ab12cd34
+train-notify --help
 ```
 
-## 配置优先级
+## 手动测试（建议发布前跑一遍）
 
-`CLI 参数 > 环境变量 > 配置文件 > 默认值`
+### 1) 成功路径
 
-- 配置文件：`~/.config/train-notify/config.toml`
-- 示例：
+```bash
+train-notify run --dry-run -- python3 -c "print('hello')"
+```
+
+预期：
+
+- 终端出现 `[STARTED]` 和 `[SUCCEEDED]` dry-run 输出
+- 命令返回码为 `0`
+
+### 2) 失败路径（重点）
+
+```bash
+train-notify run --dry-run -- python3 -c "import sys; sys.exit(3)"
+echo $?
+```
+
+预期：
+
+- 终端出现 `[train-notify][dry-run][FAILED] ... exit=3`
+- 最终返回码是 `3`
+
+### 3) 真实 webhook 路径（本地 mock）
+
+```bash
+python3 - <<'PY'
+import json, threading, subprocess, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class H(BaseHTTPRequestHandler):
+    events=[]
+    def do_POST(self):
+        n=int(self.headers.get("Content-Length","0"))
+        H.events.append(json.loads(self.rfile.read(n).decode()))
+        resp=b'{"code":0,"msg":"ok"}'
+        self.send_response(200); self.send_header("Content-Type","application/json")
+        self.send_header("Content-Length",str(len(resp))); self.end_headers(); self.wfile.write(resp)
+    def log_message(self, *args): pass
+
+s=HTTPServer(("127.0.0.1",0),H)
+t=threading.Thread(target=s.serve_forever,daemon=True); t.start()
+url=f"http://127.0.0.1:{s.server_address[1]}/hook"
+proc=subprocess.run([sys.executable,"-m","train_notify.cli","run","--webhook-url",url,"--",sys.executable,"-c","import sys; sys.exit(3)"])
+s.shutdown(); t.join(timeout=3)
+print("returncode=",proc.returncode)
+print("events=",len(H.events))
+for e in H.events:
+    print(e["content"]["text"])
+PY
+```
+
+预期：
+
+- `returncode= 3`
+- 收到 2 条事件：`STARTED` 和 `FAILED`
+
+## CLI 概览
+
+- `train-notify run -- <command...>`
+- `train-notify tmux-run --session <name> -- <command...>`
+- `train-notify status`
+- `train-notify stop --run-id <id>`
+
+## 配置
+
+优先级：`CLI > ENV > ~/.config/train-notify/config.toml > 默认值`
+
+示例：
 
 ```toml
 [train_notify]
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
-message_type = "post"  # text / post
+message_type = "text"  # text / post
 store_path = "~/.local/state/train-notify/runs.db"
 heartbeat_minutes = 30
 dry_run = false
-redact = ["(?i)my_secret=\\S+"]
+redact = ["(?i)(token=)\\S+"]
 ```
 
 环境变量：
@@ -96,56 +140,23 @@ redact = ["(?i)my_secret=\\S+"]
 - `TRAIN_NOTIFY_STORE_PATH`
 - `TRAIN_NOTIFY_HEARTBEAT_MINUTES`
 - `TRAIN_NOTIFY_DRY_RUN`
-- `TRAIN_NOTIFY_REDACT`（逗号分隔）
+- `TRAIN_NOTIFY_REDACT`
 - `TRAIN_NOTIFY_ERROR_LOG_PATH`
 
-## 通知字段
+## 开发与测试
 
-最少字段均已覆盖：
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py" -v
+```
 
-- `event`
-- `project`
-- `job_name`
-- `run_id`
-- `host`
-- `start_time` / `end_time` / `duration`
-- `exit_code`
-- `cmd`（脱敏）
-- `log_path`
-- `cwd`
-- `git_branch` / `git_commit`
+## 边界与安全说明
 
-## 与 Python 环境工具兼容说明
+- `SIGKILL` / 断电 / 宿主机崩溃不可捕获，无法即时发送中断通知。
+- 不建议将 webhook 写入仓库文件，请优先使用环境变量或本机配置文件。
+- 通知发送失败不会改变训练命令退出码；失败详情写入本地错误日志。
 
-`train-notify` 不接管环境本身，只包装并执行你传入的命令；因此天然兼容：
+## 开源协作
 
-- `conda run -n <env> ...`
-- `uv run ...`
-- `poetry run ...`
-- `venv`（激活后直接运行）
-
-## 故障排查
-
-- 无通知：
-  - 检查 `TRAIN_NOTIFY_WEBHOOK_URL` 是否有效
-  - 发送失败日志见：`~/.local/state/train-notify/notifier_errors.log`
-- `tmux-run` 失败：
-  - 确认系统已安装 `tmux`
-  - 会话名冲突时更换 `--session`
-- 命令中的敏感字段泄漏风险：
-  - 使用 `--redact '<regex>'` 或 `TRAIN_NOTIFY_REDACT`
-
-## 已知边界
-
-- `SIGKILL`、机器断电、内核崩溃等不可捕获场景，无法即时发送中断通知。
-- `tmux stop` 先发送 `Ctrl+C`，若进程不响应再强制 kill，会存在极短窗口无法优雅收尾。
-
-## npm thin-wrapper（可选方案）
-
-主实现保持 Python，原因：
-
-- 训练任务生态主要在 Python
-- 与 `conda/uv/venv` 对接更直接
-- 部署与依赖更轻
-
-如需 Node 入口，可额外加一个 npm 包，仅转发到本地 `train-notify` 命令。
+- License: MIT（见 `LICENSE`）
+- 贡献方式：见 `CONTRIBUTING.md`
+- 发布建议：见 `RELEASE.md`
