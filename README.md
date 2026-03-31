@@ -1,4 +1,6 @@
-# Train Notify
+# TrainPulse
+
+**TrainPulse** 是这个仓库/项目的名称；命令行入口仍然叫 `train-notify`。
 
 `train-notify` 是一个训练任务通知包装器：运行任意命令并在关键事件发送飞书通知，同时保留原始退出码。
 
@@ -16,7 +18,7 @@
 ## 🚀 快速开始
 
 ```bash
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 train-notify run -- python train.py --config cfg.yaml
 ```
 
@@ -93,10 +95,42 @@ train-notify run \
 - `TRAIN_NOTIFY_REDACT`（逗号分隔）
 - `TRAIN_NOTIFY_ERROR_LOG_PATH`
 
+### 4) `heartbeat-minutes` 怎么调
+
+默认值是 **30 分钟**。
+
+你可以通过三层来调：
+
+- **CLI**：`--heartbeat-minutes`
+- **ENV**：`TRAIN_NOTIFY_HEARTBEAT_MINUTES`
+- **config.toml**：`heartbeat_minutes`
+
+优先级仍然是：
+
+`CLI > ENV > config.toml > 默认值`
+
+例子：
+
+```bash
+# 临时把心跳改成每 10 分钟一次
+train-notify run --heartbeat-minutes 10 -- python train.py
+
+# 用环境变量统一改成 20 分钟
+export TRAIN_NOTIFY_HEARTBEAT_MINUTES=20
+train-notify run -- python train.py
+
+# 写进配置文件，默认长期使用 45 分钟
+# ~/.config/train-notify/config.toml
+[train_notify]
+heartbeat_minutes = 45
+```
+
+如果你完全不传，也不在环境变量或配置文件里设置，那就会使用默认的 **30**。
+
 #### 临时配置（当前 shell 会话）
 
 ```bash
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 export TRAIN_NOTIFY_MESSAGE_TYPE="post"
 ```
 
@@ -104,7 +138,7 @@ export TRAIN_NOTIFY_MESSAGE_TYPE="post"
 
 ```bash
 cat >> ~/.bashrc <<'EOF'
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 export TRAIN_NOTIFY_MESSAGE_TYPE="post"
 EOF
 source ~/.bashrc
@@ -114,15 +148,54 @@ source ~/.bashrc
 
 路径：`~/.config/train-notify/config.toml`
 
+你也可以直接从仓库里的 `config.example.toml` 复制一份到本机后再改真实值；如果用环境变量方式，也可以参考 `.env.example`。
+
 ```toml
 [train_notify]
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 message_type = "post"  # text / post
 store_path = "~/.local/state/train-notify/runs.db"
 heartbeat_minutes = 30
 dry_run = false
 redact = ["(?i)(token=)\\S+"]
 ```
+
+## 🧠 项目基本原理
+
+可以把 `TrainPulse` / `train-notify` 理解成一个包在训练命令外面的 wrapper：
+
+```text
+你的命令
+  │
+  ▼
+train-notify run / tmux-run
+  │
+  ├─ 解析 CLI / ENV / config.toml
+  ├─ 生成 run_id / project / job / context
+  ├─ 发送 STARTED
+  │
+  ├─ 启动原始训练命令
+  │    └─ 保留并等待真实退出码
+  │
+  ├─ 运行中按 heartbeat_minutes 发送 HEARTBEAT
+  │
+  └─ 结束后根据结果发送：
+       ├─ SUCCEEDED
+       ├─ FAILED
+       └─ INTERRUPTED
+
+通知消息 ──> notifier ──> webhook
+运行记录 ──> store(SQLite)
+最终退出码 ──> 原样返回给调用方
+```
+
+也就是说，它做的是：
+- 帮你包住原始训练命令
+- 在关键节点发通知
+- 记录运行状态
+- 但**不吞掉原始退出码**
+
+所以外部调度器、shell 脚本、CI 依然可以根据真实退出码判断任务成功或失败。
 
 ## 🧪 手动测试（发布前建议）
 

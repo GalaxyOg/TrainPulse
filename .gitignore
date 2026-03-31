@@ -6,5 +6,18 @@ dist/
 build/
 *.egg-info/
 
+# local environment and state
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
 # local task prompt
 CODEX_PROMPT_跨项目训练通知系统.md
+
+# local runtime / editor noise
+.DS_Store
+.vscode/
+.idea/
