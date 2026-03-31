@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Iterator, Optional
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class RunStore:
+    def __init__(self, db_path: str) -> None:
+        self.db_path = Path(db_path).expanduser()
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    @contextmanager
+    def _conn(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(str(self.db_path), timeout=10)
+        try:
+            conn.row_factory = sqlite3.Row
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _init_db(self) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS runs (
+                    run_id TEXT PRIMARY KEY,
+                    event TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    project TEXT NOT NULL,
+                    job_name TEXT NOT NULL,
+                    cmd TEXT NOT NULL,
+                    host TEXT NOT NULL,
+                    cwd TEXT NOT NULL,
+                    git_branch TEXT,
+                    git_commit TEXT,
+                    log_path TEXT,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT,
+                    duration REAL,
+                    exit_code INTEGER,
+                    pid INTEGER,
+                    tmux_session TEXT,
+                    last_heartbeat TEXT,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_updated_at ON runs(updated_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status)"
+            )
+
+    def start_run(self, context: dict) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO runs (
+                    run_id, event, status, project, job_name, cmd, host, cwd,
+                    git_branch, git_commit, log_path, start_time, end_time,
+                    duration, exit_code, pid, tmux_session, last_heartbeat, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    context["run_id"],
+                    "STARTED",
+                    "RUNNING",
+                    context["project"],
+                    context["job_name"],
+                    context["cmd"],
+                    context["host"],
+                    context["cwd"],
+                    context.get("git_branch"),
+                    context.get("git_commit"),
+                    context.get("log_path"),
+                    context["start_time"],
+                    None,
+                    None,
+                    None,
+                    context.get("pid"),
+                    context.get("tmux_session"),
+                    None,
+                    _now(),
+                ),
+            )
+
+    def heartbeat(self, run_id: str) -> None:
+        ts = _now()
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE runs
+                SET event = ?, last_heartbeat = ?, updated_at = ?
+                WHERE run_id = ?
+                """,
+                ("HEARTBEAT", ts, ts, run_id),
+            )
+
+    def finish_run(
+        self,
+        run_id: str,
+        event: str,
+        exit_code: Optional[int],
+        end_time: str,
+        duration: float,
+    ) -> None:
+        status = "SUCCEEDED" if event == "SUCCEEDED" else event
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE runs
+                SET event = ?, status = ?, exit_code = ?, end_time = ?, duration = ?, updated_at = ?
+                WHERE run_id = ?
+                """,
+                (event, status, exit_code, end_time, duration, _now(), run_id),
+            )
+
+    def get_run(self, run_id: str) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            return dict(row) if row else None
+
+    def list_runs(self, limit: int = 20, running_only: bool = False) -> list[dict]:
+        with self._conn() as conn:
+            if running_only:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM runs
+                    WHERE status = 'RUNNING'
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM runs
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+            return [dict(row) for row in rows]
