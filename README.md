@@ -16,7 +16,7 @@
 ## 🚀 快速开始
 
 ```bash
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 train-notify run -- python train.py --config cfg.yaml
 ```
 
@@ -96,7 +96,7 @@ train-notify run \
 #### 临时配置（当前 shell 会话）
 
 ```bash
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 export TRAIN_NOTIFY_MESSAGE_TYPE="post"
 ```
 
@@ -104,7 +104,7 @@ export TRAIN_NOTIFY_MESSAGE_TYPE="post"
 
 ```bash
 cat >> ~/.bashrc <<'EOF'
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 export TRAIN_NOTIFY_MESSAGE_TYPE="post"
 EOF
 source ~/.bashrc
@@ -114,9 +114,11 @@ source ~/.bashrc
 
 路径：`~/.config/train-notify/config.toml`
 
+你也可以直接从仓库里的 `config.example.toml` 复制一份到本机后再改真实值；如果用环境变量方式，也可以参考 `.env.example`。
+
 ```toml
 [train_notify]
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 message_type = "post"  # text / post
 store_path = "~/.local/state/train-notify/runs.db"
 heartbeat_minutes = 30
