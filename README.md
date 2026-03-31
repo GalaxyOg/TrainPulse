@@ -18,7 +18,16 @@
 ## 🚀 快速开始
 
 ```bash
-export TRAINPULSE_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+# 1) 一次配置（长期生效，不用改 ~/.bashrc）
+mkdir -p ~/.config/trainpulse
+cat > ~/.config/trainpulse/config.toml <<'EOF'
+[trainpulse]
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+heartbeat_minutes = 5
+message_type = "post"
+EOF
+
+# 2) 直接运行（无需每次传 webhook 和 heartbeat）
 trainpulse run -- python train.py --config cfg.yaml
 ```
 
@@ -53,6 +62,25 @@ trainpulse --help
 python3 -m trainpulse --help
 ```
 
+安装后推荐做一次长期配置（不依赖 `bashrc`）：
+
+```bash
+mkdir -p ~/.config/trainpulse
+cat > ~/.config/trainpulse/config.toml <<'EOF'
+[trainpulse]
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+heartbeat_minutes = 5
+message_type = "post"
+store_path = "~/.local/state/trainpulse/runs.db"
+EOF
+```
+
+完成后日常直接使用：
+
+```bash
+trainpulse run -- python train.py
+```
+
 ## ⚙️ 配置方式与优先级
 
 优先级始终是：
@@ -85,7 +113,7 @@ trainpulse run \
 
 ### 2) 环境变量
 
-支持变量：
+适合临时实验或 CI 临时覆盖。支持变量：
 
 - `TRAINPULSE_WEBHOOK_URL`
 - `TRAINPULSE_MESSAGE_TYPE`
@@ -94,6 +122,22 @@ trainpulse run \
 - `TRAINPULSE_DRY_RUN`
 - `TRAINPULSE_REDACT`（逗号分隔）
 - `TRAINPULSE_ERROR_LOG_PATH`
+
+### 3) 配置文件（最低优先级）
+
+路径：`~/.config/trainpulse/config.toml`
+
+这是最推荐的长期配置方式。你也可以直接从仓库里的 `config.example.toml` 复制一份到本机后再改真实值；如果用环境变量方式，也可以参考 `.env.example`。
+
+```toml
+[trainpulse]
+webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+message_type = "post"  # text / post
+store_path = "~/.local/state/trainpulse/runs.db"
+heartbeat_minutes = 30
+dry_run = false
+redact = ["(?i)(token=)\\S+"]
+```
 
 ### 4) `heartbeat-minutes` 怎么调
 
@@ -115,50 +159,19 @@ trainpulse run \
 # 临时把心跳改成每 10 分钟一次
 trainpulse run --heartbeat-minutes 10 -- python train.py
 
-# 用环境变量统一改成 20 分钟
+# 当前 shell 临时改成 20 分钟
 export TRAINPULSE_HEARTBEAT_MINUTES=20
 trainpulse run -- python train.py
 
-# 写进配置文件，默认长期使用 45 分钟
-# ~/.config/trainpulse/config.toml
+# 长期固定成 5 分钟（推荐）
+mkdir -p ~/.config/trainpulse
+cat > ~/.config/trainpulse/config.toml <<'EOF'
 [trainpulse]
-heartbeat_minutes = 45
+heartbeat_minutes = 5
+EOF
 ```
 
 如果你完全不传，也不在环境变量或配置文件里设置，那就会使用默认的 **30**。
-
-#### 临时配置（当前 shell 会话）
-
-```bash
-export TRAINPULSE_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-export TRAINPULSE_MESSAGE_TYPE="post"
-```
-
-#### 持久化配置（长期生效）
-
-```bash
-cat >> ~/.bashrc <<'EOF'
-export TRAINPULSE_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-export TRAINPULSE_MESSAGE_TYPE="post"
-EOF
-source ~/.bashrc
-```
-
-### 3) 配置文件（最低优先级）
-
-路径：`~/.config/trainpulse/config.toml`
-
-你也可以直接从仓库里的 `config.example.toml` 复制一份到本机后再改真实值；如果用环境变量方式，也可以参考 `.env.example`。
-
-```toml
-[trainpulse]
-webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-message_type = "post"  # text / post
-store_path = "~/.local/state/trainpulse/runs.db"
-heartbeat_minutes = 30
-dry_run = false
-redact = ["(?i)(token=)\\S+"]
-```
 
 ## 🧠 项目基本原理
 
