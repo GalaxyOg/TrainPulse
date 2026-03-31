@@ -15,6 +15,14 @@ def _iso_now() -> str:
 
 
 class FeishuNotifier:
+    EVENT_STYLE = {
+        "STARTED": ("🚀", "Task Started"),
+        "SUCCEEDED": ("✅", "Task Succeeded"),
+        "FAILED": ("❌", "Task Failed"),
+        "INTERRUPTED": ("⛔", "Task Interrupted"),
+        "HEARTBEAT": ("💓", "Task Heartbeat"),
+    }
+
     def __init__(
         self,
         webhook_url: Optional[str],
@@ -35,6 +43,9 @@ class FeishuNotifier:
             else Path("~/.local/state/train-notify/notifier_errors.log").expanduser()
         )
 
+    def _event_style(self, event: str) -> tuple[str, str]:
+        return self.EVENT_STYLE.get(event, ("🔔", "Task Event"))
+
     def _write_error(self, message: str) -> None:
         try:
             self.error_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,52 +55,73 @@ class FeishuNotifier:
             pass
 
     def _build_text(self, payload: dict) -> str:
-        parts = [
-            f"[{payload['event']}] {payload.get('project', '-')}",
-            f"job={payload.get('job_name', '-')}",
-            f"run_id={payload.get('run_id', '-')}",
-            f"host={payload.get('host', '-')}",
+        event = str(payload.get("event", "UNKNOWN"))
+        emoji, label = self._event_style(event)
+        lines = [
+            f"{emoji} [{event}] {label} | {payload.get('project', '-')}",
+            f"🧩 job: {payload.get('job_name', '-')}",
+            f"🆔 run_id: {payload.get('run_id', '-')}",
+            f"🖥️ host: {payload.get('host', '-')}",
         ]
+        if payload.get("cwd"):
+            lines.append(f"📂 cwd: {payload.get('cwd')}")
+        if payload.get("git_branch") or payload.get("git_commit"):
+            lines.append(
+                f"🌿 git: {payload.get('git_branch') or '-'}@{payload.get('git_commit') or '-'}"
+            )
+        if payload.get("start_time"):
+            lines.append(f"🕒 start: {payload.get('start_time')}")
+        if payload.get("end_time"):
+            lines.append(f"🕓 end: {payload.get('end_time')}")
         if payload.get("exit_code") is not None:
-            parts.append(f"exit={payload.get('exit_code')}")
+            lines.append(f"📉 exit_code: {payload.get('exit_code')}")
         if payload.get("duration") is not None:
-            parts.append(f"duration={payload.get('duration')}s")
+            lines.append(f"⏱️ duration: {payload.get('duration')}s")
         if payload.get("log_path"):
-            parts.append(f"log={payload.get('log_path')}")
-        return " | ".join(parts)
+            lines.append(f"📝 log: {payload.get('log_path')}")
+        if payload.get("cmd"):
+            lines.append(f"💻 cmd: {payload.get('cmd')}")
+        return "\n".join(lines)
 
     def build_message(self, payload: dict) -> dict:
+        event = str(payload.get("event", "UNKNOWN"))
+        emoji, label = self._event_style(event)
         if self.message_type == "post":
             lines = [
-                [{"tag": "text", "text": f"event: {payload.get('event', '-')}"}],
-                [{"tag": "text", "text": f"project: {payload.get('project', '-')}"}],
-                [{"tag": "text", "text": f"job: {payload.get('job_name', '-')}"}],
-                [{"tag": "text", "text": f"run_id: {payload.get('run_id', '-')}"}],
-                [{"tag": "text", "text": f"host: {payload.get('host', '-')}"}],
-                [{"tag": "text", "text": f"cwd: {payload.get('cwd', '-')}"}],
-                [{"tag": "text", "text": f"cmd: {payload.get('cmd', '-')}"}],
+                [{"tag": "text", "text": f"{emoji} event: {event}"}],
+                [{"tag": "text", "text": f"📦 project: {payload.get('project', '-')}"}],
+                [{"tag": "text", "text": f"🧩 job: {payload.get('job_name', '-')}"}],
+                [{"tag": "text", "text": f"🆔 run_id: {payload.get('run_id', '-')}"}],
+                [{"tag": "text", "text": f"🖥️ host: {payload.get('host', '-')}"}],
+                [{"tag": "text", "text": f"📂 cwd: {payload.get('cwd', '-')}"}],
             ]
-            if payload.get("exit_code") is not None:
-                lines.append([{"tag": "text", "text": f"exit_code: {payload.get('exit_code')}"}])
-            if payload.get("duration") is not None:
-                lines.append([{"tag": "text", "text": f"duration: {payload.get('duration')}s"}])
-            if payload.get("log_path"):
-                lines.append([{"tag": "text", "text": f"log_path: {payload.get('log_path')}"}])
             if payload.get("git_branch") or payload.get("git_commit"):
                 lines.append(
                     [
                         {
                             "tag": "text",
-                            "text": f"git: {payload.get('git_branch') or '-'}@{payload.get('git_commit') or '-'}",
+                            "text": f"🌿 git: {payload.get('git_branch') or '-'}@{payload.get('git_commit') or '-'}",
                         }
                     ]
                 )
+            if payload.get("start_time"):
+                lines.append([{"tag": "text", "text": f"🕒 start: {payload.get('start_time')}"}])
+            if payload.get("end_time"):
+                lines.append([{"tag": "text", "text": f"🕓 end: {payload.get('end_time')}"}])
+            if payload.get("duration") is not None:
+                lines.append([{"tag": "text", "text": f"⏱️ duration: {payload.get('duration')}s"}])
+            if payload.get("exit_code") is not None:
+                lines.append([{"tag": "text", "text": f"📉 exit_code: {payload.get('exit_code')}"}])
+            if payload.get("log_path"):
+                lines.append([{"tag": "text", "text": f"📝 log: {payload.get('log_path')}"}])
+            if payload.get("cmd"):
+                lines.append([{"tag": "text", "text": f"💻 cmd: {payload.get('cmd')}"}])
             return {
                 "msg_type": "post",
                 "content": {
                     "post": {
                         "zh_cn": {
-                            "title": f"[{payload.get('event', '-')}] {payload.get('project', '-')}",
+                            "title": f"{emoji} {label} · {payload.get('project', '-')}",
                             "content": lines,
                         }
                     }

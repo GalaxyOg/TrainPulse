@@ -30,16 +30,21 @@ class NotifierTests(unittest.TestCase):
         message = notifier.build_message(_payload())
         self.assertEqual(message["msg_type"], "text")
         text = message["content"]["text"]
-        self.assertIn("[FAILED] demo", text)
-        self.assertIn("job=train", text)
-        self.assertIn("exit=2", text)
+        self.assertIn("❌ [FAILED] Task Failed | demo", text)
+        self.assertIn("🧩 job: train", text)
+        self.assertIn("📉 exit_code: 2", text)
+        self.assertIn("💻 cmd: python train.py", text)
 
     def test_post_message_format(self) -> None:
         notifier = FeishuNotifier(webhook_url=None, message_type="post", dry_run=True)
         message = notifier.build_message(_payload())
         self.assertEqual(message["msg_type"], "post")
         title = message["content"]["post"]["zh_cn"]["title"]
-        self.assertIn("[FAILED] demo", title)
+        self.assertEqual(title, "❌ Task Failed · demo")
+        content = message["content"]["post"]["zh_cn"]["content"]
+        flattened = " ".join(item["text"] for line in content for item in line)
+        self.assertIn("📦 project: demo", flattened)
+        self.assertIn("📉 exit_code: 2", flattened)
 
     def test_dry_run_send_prints_failed_event(self) -> None:
         notifier = FeishuNotifier(webhook_url=None, message_type="text", dry_run=True)
@@ -49,7 +54,7 @@ class NotifierTests(unittest.TestCase):
         self.assertTrue(ok)
         output = buffer.getvalue()
         self.assertIn("[train-notify][dry-run][FAILED]", output)
-        self.assertIn("[FAILED] demo", output)
+        self.assertIn("❌ [FAILED] Task Failed | demo", output)
 
     def test_send_without_webhook_prints_visible_warning(self) -> None:
         payload = dict(_payload(), event="FAILED")
