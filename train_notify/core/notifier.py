@@ -103,12 +103,20 @@ class FeishuNotifier:
 
     def send(self, payload: dict) -> bool:
         body = self.build_message(payload)
+        event = str(payload.get("event", "UNKNOWN"))
         if self.dry_run:
-            print(f"[train-notify][dry-run] {json.dumps(body, ensure_ascii=False)}", file=sys.stderr)
+            summary = self._build_text(payload)
+            print(f"[train-notify][dry-run][{event}] {summary}", file=sys.stderr)
+            print(
+                f"[train-notify][dry-run][payload] {json.dumps(body, ensure_ascii=False)}",
+                file=sys.stderr,
+            )
             return True
 
         if not self.webhook_url:
-            self._write_error("webhook_url is empty, skip notification")
+            message = f"[train-notify][notify][{event}] webhook_url is empty, skip notification"
+            print(message, file=sys.stderr)
+            self._write_error(message)
             return False
 
         request = urllib.request.Request(
@@ -137,4 +145,8 @@ class FeishuNotifier:
                 if attempt < self.retries:
                     time.sleep(delay)
                     delay = min(delay * 2, 8.0)
+        print(
+            f"[train-notify][notify][{event}] delivery failed after {self.retries} attempt(s)",
+            file=sys.stderr,
+        )
         return False

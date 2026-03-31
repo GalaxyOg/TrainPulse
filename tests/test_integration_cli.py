@@ -202,6 +202,27 @@ class CliIntegrationTests(unittest.TestCase):
             conn.close()
         self.assertGreaterEqual(len(rows), 3)
 
+    def test_failed_dry_run_has_visible_failed_output(self) -> None:
+        repo = self.root / "repo_dryrun_fail"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+
+        failed = self._run_cli(
+            [
+                "run",
+                "--dry-run",
+                "--store-path",
+                str(self.store_path),
+                "--",
+                sys.executable,
+                "-c",
+                "import sys; sys.exit(3)",
+            ],
+            cwd=repo,
+        )
+        self.assertEqual(failed.returncode, 3, failed.stderr)
+        self.assertIn("[train-notify][dry-run][FAILED]", failed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
