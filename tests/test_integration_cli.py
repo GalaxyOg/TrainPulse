@@ -70,7 +70,7 @@ class CliIntegrationTests(unittest.TestCase):
 
     def _run_cli(self, args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            [sys.executable, "-m", "train_notify.cli", *args],
+            [sys.executable, "-m", "trainpulse.cli", *args],
             cwd=str(cwd),
             env=self.env,
             capture_output=True,
@@ -133,7 +133,7 @@ class CliIntegrationTests(unittest.TestCase):
             [
                 sys.executable,
                 "-m",
-                "train_notify.cli",
+                "trainpulse.cli",
                 "run",
                 "--webhook-url",
                 self.webhook_url,
@@ -171,7 +171,7 @@ class CliIntegrationTests(unittest.TestCase):
                     [
                         sys.executable,
                         "-m",
-                        "train_notify.cli",
+                        "trainpulse.cli",
                         "run",
                         "--webhook-url",
                         self.webhook_url,
@@ -221,7 +221,7 @@ class CliIntegrationTests(unittest.TestCase):
             cwd=repo,
         )
         self.assertEqual(failed.returncode, 3, failed.stderr)
-        self.assertIn("[train-notify][dry-run][FAILED]", failed.stderr)
+        self.assertIn("[trainpulse][dry-run][FAILED]", failed.stderr)
 
 
 if __name__ == "__main__":

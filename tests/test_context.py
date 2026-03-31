@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from train_notify.core.context import detect_project_name, infer_job_name
+from trainpulse.core.context import detect_project_name, infer_job_name
 
 
 class ContextTests(unittest.TestCase):

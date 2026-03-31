@@ -40,7 +40,7 @@ class FeishuNotifier:
         self.error_log_path = (
             Path(error_log_path).expanduser()
             if error_log_path
-            else Path("~/.local/state/train-notify/notifier_errors.log").expanduser()
+            else Path("~/.local/state/trainpulse/notifier_errors.log").expanduser()
         )
 
     def _event_style(self, event: str) -> tuple[str, str]:
@@ -138,15 +138,15 @@ class FeishuNotifier:
         event = str(payload.get("event", "UNKNOWN"))
         if self.dry_run:
             summary = self._build_text(payload)
-            print(f"[train-notify][dry-run][{event}] {summary}", file=sys.stderr)
+            print(f"[trainpulse][dry-run][{event}] {summary}", file=sys.stderr)
             print(
-                f"[train-notify][dry-run][payload] {json.dumps(body, ensure_ascii=False)}",
+                f"[trainpulse][dry-run][payload] {json.dumps(body, ensure_ascii=False)}",
                 file=sys.stderr,
             )
             return True
 
         if not self.webhook_url:
-            message = f"[train-notify][notify][{event}] webhook_url is empty, skip notification"
+            message = f"[trainpulse][notify][{event}] webhook_url is empty, skip notification"
             print(message, file=sys.stderr)
             self._write_error(message)
             return False
@@ -178,7 +178,7 @@ class FeishuNotifier:
                     time.sleep(delay)
                     delay = min(delay * 2, 8.0)
         print(
-            f"[train-notify][notify][{event}] delivery failed after {self.retries} attempt(s)",
+            f"[trainpulse][notify][{event}] delivery failed after {self.retries} attempt(s)",
             file=sys.stderr,
         )
         return False

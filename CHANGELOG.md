@@ -8,6 +8,7 @@ The format is inspired by Keep a Changelog and uses semantic versioning.
 
 ### Changed
 
+- Unified public naming across repo/package/CLI/module to `TrainPulse` / `trainpulse`.
 - Improved Feishu message rendering with event emojis and more structured `post` content.
 - Improved default `text` message readability (multi-line key fields).
 - Reworked README with clearer configuration hierarchy and environment variable setup.

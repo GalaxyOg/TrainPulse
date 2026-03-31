@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "train-notify"
+name = "TrainPulse"
 version = "0.1.0"
 description = "Cross-repository training notification and supervision tool for Feishu webhook."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Train Notify Contributors" }]
+authors = [{ name = "TrainPulse Contributors" }]
 keywords = ["training", "notification", "feishu", "webhook", "tmux", "mlops"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -28,7 +28,7 @@ dependencies = []
 dev = []
 
 [project.scripts]
-train-notify = "train_notify.cli:main"
+trainpulse = "trainpulse.cli:main"
 
 [tool.setuptools]
 include-package-data = true
@@ -36,4 +36,4 @@ license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["train_notify*"]
+include = ["trainpulse*"]

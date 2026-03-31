@@ -1,8 +1,8 @@
 # TrainPulse
 
-**TrainPulse** 是这个仓库/项目的名称；命令行入口仍然叫 `train-notify`。
+**TrainPulse** 是仓库与对外项目名，CLI 主入口统一为 `trainpulse`。
 
-`train-notify` 是一个训练任务通知包装器：运行任意命令并在关键事件发送飞书通知，同时保留原始退出码。
+`trainpulse` 是一个训练任务通知包装器：运行任意命令并在关键事件发送飞书通知，同时保留原始退出码。
 
 支持事件：`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED` / `HEARTBEAT`
 
@@ -18,21 +18,21 @@
 ## 🚀 快速开始
 
 ```bash
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-train-notify run -- python train.py --config cfg.yaml
+export TRAINPULSE_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+trainpulse run -- python train.py --config cfg.yaml
 ```
 
 更多例子：
 
 ```bash
 # conda
-train-notify run -- conda run -n rlzoo3 python script/run.py
+trainpulse run -- conda run -n rlzoo3 python script/run.py
 
 # uv
-train-notify run -- uv run python train.py
+trainpulse run -- uv run python train.py
 
 # tmux 后台
-train-notify tmux-run --session exp1 --log-path ./log/train.log -- \
+trainpulse tmux-run --session exp1 --log-path ./log/train.log -- \
   python train.py --config cfg.yaml
 ```
 
@@ -49,15 +49,15 @@ pipx install .
 验证：
 
 ```bash
-train-notify --help
-python3 -m train_notify --help
+trainpulse --help
+python3 -m trainpulse --help
 ```
 
 ## ⚙️ 配置方式与优先级
 
 优先级始终是：
 
-`命令行参数 > 环境变量 > ~/.config/train-notify/config.toml > 默认值`
+`命令行参数 > 环境变量 > ~/.config/trainpulse/config.toml > 默认值`
 
 ### 1) 命令行参数（最高优先级）
 
@@ -76,7 +76,7 @@ python3 -m train_notify --help
 示例：
 
 ```bash
-train-notify run \
+trainpulse run \
   --message-type post \
   --heartbeat-minutes 30 \
   --redact '(?i)(token=)\\S+' \
@@ -87,13 +87,13 @@ train-notify run \
 
 支持变量：
 
-- `TRAIN_NOTIFY_WEBHOOK_URL`
-- `TRAIN_NOTIFY_MESSAGE_TYPE`
-- `TRAIN_NOTIFY_STORE_PATH`
-- `TRAIN_NOTIFY_HEARTBEAT_MINUTES`
-- `TRAIN_NOTIFY_DRY_RUN`
-- `TRAIN_NOTIFY_REDACT`（逗号分隔）
-- `TRAIN_NOTIFY_ERROR_LOG_PATH`
+- `TRAINPULSE_WEBHOOK_URL`
+- `TRAINPULSE_MESSAGE_TYPE`
+- `TRAINPULSE_STORE_PATH`
+- `TRAINPULSE_HEARTBEAT_MINUTES`
+- `TRAINPULSE_DRY_RUN`
+- `TRAINPULSE_REDACT`（逗号分隔）
+- `TRAINPULSE_ERROR_LOG_PATH`
 
 ### 4) `heartbeat-minutes` 怎么调
 
@@ -102,7 +102,7 @@ train-notify run \
 你可以通过三层来调：
 
 - **CLI**：`--heartbeat-minutes`
-- **ENV**：`TRAIN_NOTIFY_HEARTBEAT_MINUTES`
+- **ENV**：`TRAINPULSE_HEARTBEAT_MINUTES`
 - **config.toml**：`heartbeat_minutes`
 
 优先级仍然是：
@@ -113,15 +113,15 @@ train-notify run \
 
 ```bash
 # 临时把心跳改成每 10 分钟一次
-train-notify run --heartbeat-minutes 10 -- python train.py
+trainpulse run --heartbeat-minutes 10 -- python train.py
 
 # 用环境变量统一改成 20 分钟
-export TRAIN_NOTIFY_HEARTBEAT_MINUTES=20
-train-notify run -- python train.py
+export TRAINPULSE_HEARTBEAT_MINUTES=20
+trainpulse run -- python train.py
 
 # 写进配置文件，默认长期使用 45 分钟
-# ~/.config/train-notify/config.toml
-[train_notify]
+# ~/.config/trainpulse/config.toml
+[trainpulse]
 heartbeat_minutes = 45
 ```
 
@@ -130,31 +130,31 @@ heartbeat_minutes = 45
 #### 临时配置（当前 shell 会话）
 
 ```bash
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-export TRAIN_NOTIFY_MESSAGE_TYPE="post"
+export TRAINPULSE_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+export TRAINPULSE_MESSAGE_TYPE="post"
 ```
 
 #### 持久化配置（长期生效）
 
 ```bash
 cat >> ~/.bashrc <<'EOF'
-export TRAIN_NOTIFY_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-export TRAIN_NOTIFY_MESSAGE_TYPE="post"
+export TRAINPULSE_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
+export TRAINPULSE_MESSAGE_TYPE="post"
 EOF
 source ~/.bashrc
 ```
 
 ### 3) 配置文件（最低优先级）
 
-路径：`~/.config/train-notify/config.toml`
+路径：`~/.config/trainpulse/config.toml`
 
 你也可以直接从仓库里的 `config.example.toml` 复制一份到本机后再改真实值；如果用环境变量方式，也可以参考 `.env.example`。
 
 ```toml
-[train_notify]
+[trainpulse]
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 message_type = "post"  # text / post
-store_path = "~/.local/state/train-notify/runs.db"
+store_path = "~/.local/state/trainpulse/runs.db"
 heartbeat_minutes = 30
 dry_run = false
 redact = ["(?i)(token=)\\S+"]
@@ -162,13 +162,13 @@ redact = ["(?i)(token=)\\S+"]
 
 ## 🧠 项目基本原理
 
-可以把 `TrainPulse` / `train-notify` 理解成一个包在训练命令外面的 wrapper：
+可以把 `TrainPulse` / `trainpulse` 理解成一个包在训练命令外面的 wrapper：
 
 ```text
 你的命令
   │
   ▼
-train-notify run / tmux-run
+trainpulse run / tmux-run
   │
   ├─ 解析 CLI / ENV / config.toml
   ├─ 生成 run_id / project / job / context
@@ -197,12 +197,32 @@ train-notify run / tmux-run
 
 所以外部调度器、shell 脚本、CI 依然可以根据真实退出码判断任务成功或失败。
 
+## 🗺️ 运行架构图
+
+```mermaid
+flowchart TD
+    A[User Command<br/>trainpulse run/tmux-run -- ...] --> B[CLI Parser<br/>argparse]
+    B --> C[Runtime Resolver<br/>CLI > ENV > config.toml]
+    C --> D[Context Builder<br/>run_id/project/job/git/cmd]
+    D --> E[CommandRunner]
+    E --> F[Wrapped Training Process]
+    E --> G[RunStore<br/>SQLite]
+    E --> H[FeishuNotifier]
+    E --> I[Heartbeat Scheduler]
+    I --> H
+    F --> E
+    E --> J[Final Event<br/>SUCCEEDED/FAILED/INTERRUPTED]
+    J --> H
+    J --> G
+    E --> K[Exit Code passthrough]
+```
+
 ## 🧪 手动测试（发布前建议）
 
 ### 成功路径
 
 ```bash
-train-notify run --dry-run -- python3 -c "print('hello')"
+trainpulse run --dry-run -- python3 -c "print('hello')"
 ```
 
 预期：看到 `STARTED` + `SUCCEEDED`，返回码 `0`
@@ -210,11 +230,11 @@ train-notify run --dry-run -- python3 -c "print('hello')"
 ### 失败路径（重点）
 
 ```bash
-train-notify run --dry-run -- python3 -c "import sys; sys.exit(3)"
+trainpulse run --dry-run -- python3 -c "import sys; sys.exit(3)"
 echo $?
 ```
 
-预期：看到 `[train-notify][dry-run][FAILED] ...`，返回码 `3`
+预期：看到 `[trainpulse][dry-run][FAILED] ...`，返回码 `3`
 
 ### 真实 webhook 路径（本地 mock）
 
@@ -236,7 +256,7 @@ class H(BaseHTTPRequestHandler):
 s=HTTPServer(("127.0.0.1",0),H)
 t=threading.Thread(target=s.serve_forever,daemon=True); t.start()
 url=f"http://127.0.0.1:{s.server_address[1]}/hook"
-proc=subprocess.run([sys.executable,"-m","train_notify.cli","run","--webhook-url",url,"--",sys.executable,"-c","import sys; sys.exit(3)"])
+proc=subprocess.run([sys.executable,"-m","trainpulse.cli","run","--webhook-url",url,"--",sys.executable,"-c","import sys; sys.exit(3)"])
 s.shutdown(); t.join(timeout=3)
 print("returncode=",proc.returncode)
 print("events=",len(H.events))

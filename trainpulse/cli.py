@@ -11,11 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from train_notify.core.context import build_run_context, infer_job_name
-from train_notify.core.notifier import FeishuNotifier
-from train_notify.core.runner import CommandRunner
-from train_notify.core.store import RunStore
-from train_notify.integrations.tmux import (
+from trainpulse.core.context import build_run_context, infer_job_name
+from trainpulse.core.notifier import FeishuNotifier
+from trainpulse.core.runner import CommandRunner
+from trainpulse.core.store import RunStore
+from trainpulse.integrations.tmux import (
     has_tmux,
     session_exists,
     start_detached_session,
@@ -28,9 +28,9 @@ except ModuleNotFoundError:  # pragma: no cover
     tomllib = None  # type: ignore[assignment]
 
 
-DEFAULT_CONFIG_PATH = "~/.config/train-notify/config.toml"
-DEFAULT_STORE_PATH = "~/.local/state/train-notify/runs.db"
-DEFAULT_ERROR_LOG_PATH = "~/.local/state/train-notify/notifier_errors.log"
+DEFAULT_CONFIG_PATH = "~/.config/trainpulse/config.toml"
+DEFAULT_STORE_PATH = "~/.local/state/trainpulse/runs.db"
+DEFAULT_ERROR_LOG_PATH = "~/.local/state/trainpulse/notifier_errors.log"
 
 
 def _str_to_bool(value: Optional[str]) -> Optional[bool]:
@@ -51,8 +51,8 @@ def _load_config_file(path: str) -> dict[str, Any]:
     content = file_path.read_text(encoding="utf-8")
     if tomllib is None:
         data = _parse_basic_toml(content)
-        if isinstance(data.get("train_notify"), dict):
-            return data["train_notify"]
+        if isinstance(data.get("trainpulse"), dict):
+            return data["trainpulse"]
         return data
     try:
         data = tomllib.loads(content)
@@ -60,8 +60,8 @@ def _load_config_file(path: str) -> dict[str, Any]:
         return {}
     if not isinstance(data, dict):
         return {}
-    if isinstance(data.get("train_notify"), dict):
-        return data["train_notify"]
+    if isinstance(data.get("trainpulse"), dict):
+        return data["trainpulse"]
     return data
 
 
@@ -130,7 +130,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
         return default
 
     dry_run_cli = getattr(args, "dry_run", None)
-    dry_run_env = _str_to_bool(env.get("TRAIN_NOTIFY_DRY_RUN"))
+    dry_run_env = _str_to_bool(env.get("TRAINPULSE_DRY_RUN"))
     dry_run_cfg = file_cfg.get("dry_run")
     if dry_run_cli is not None:
         dry_run = dry_run_cli
@@ -142,7 +142,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
         dry_run = False
 
     heartbeat_cli = getattr(args, "heartbeat_minutes", None)
-    heartbeat_env = env.get("TRAIN_NOTIFY_HEARTBEAT_MINUTES")
+    heartbeat_env = env.get("TRAINPULSE_HEARTBEAT_MINUTES")
     heartbeat_cfg = file_cfg.get("heartbeat_minutes")
     heartbeat_minutes = heartbeat_cli
     if heartbeat_minutes is None and heartbeat_env:
@@ -154,7 +154,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
         heartbeat_minutes = heartbeat_cfg
 
     redact_cli = getattr(args, "redact", None)
-    redact_env = env.get("TRAIN_NOTIFY_REDACT")
+    redact_env = env.get("TRAINPULSE_REDACT")
     redact_cfg = file_cfg.get("redact")
     if redact_cli is not None:
         redact = redact_cli
@@ -168,7 +168,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
     message_type = str(
         pick(
             getattr(args, "message_type", None),
-            "TRAIN_NOTIFY_MESSAGE_TYPE",
+            "TRAINPULSE_MESSAGE_TYPE",
             "message_type",
             "text",
         )
@@ -179,7 +179,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "webhook_url": pick(
             getattr(args, "webhook_url", None),
-            "TRAIN_NOTIFY_WEBHOOK_URL",
+            "TRAINPULSE_WEBHOOK_URL",
             "webhook_url",
             None,
         ),
@@ -188,7 +188,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
             Path(
                 pick(
                     getattr(args, "store_path", None),
-                    "TRAIN_NOTIFY_STORE_PATH",
+                    "TRAINPULSE_STORE_PATH",
                     "store_path",
                     DEFAULT_STORE_PATH,
                 )
@@ -198,7 +198,7 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
             Path(
                 pick(
                     getattr(args, "error_log_path", None),
-                    "TRAIN_NOTIFY_ERROR_LOG_PATH",
+                    "TRAINPULSE_ERROR_LOG_PATH",
                     "error_log_path",
                     DEFAULT_ERROR_LOG_PATH,
                 )
@@ -226,7 +226,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     runtime = _resolve_runtime(args)
     command = _normalize_cmd(args.cmd)
     if not command:
-        print("error: missing command, use: train-notify run -- <command...>", file=sys.stderr)
+        print("error: missing command, use: trainpulse run -- <command...>", file=sys.stderr)
         return 2
 
     run_id = args.run_id or _generate_run_id()
@@ -259,10 +259,10 @@ def cmd_tmux_run(args: argparse.Namespace) -> int:
     runtime = _resolve_runtime(args)
     command = _normalize_cmd(args.cmd)
     if not command:
-        print("error: missing command, use: train-notify tmux-run --session s -- <command...>", file=sys.stderr)
+        print("error: missing command, use: trainpulse tmux-run --session s -- <command...>", file=sys.stderr)
         return 2
     if not has_tmux():
-        print("error: tmux is not installed; use `train-notify run` instead.", file=sys.stderr)
+        print("error: tmux is not installed; use `trainpulse run` instead.", file=sys.stderr)
         return 2
     if session_exists(args.session):
         print(f"error: tmux session already exists: {args.session}", file=sys.stderr)
@@ -272,7 +272,7 @@ def cmd_tmux_run(args: argparse.Namespace) -> int:
     inner = [
         sys.executable,
         "-m",
-        "train_notify.cli",
+        "trainpulse.cli",
         "run",
         "--run-id",
         run_id,
@@ -300,7 +300,7 @@ def cmd_tmux_run(args: argparse.Namespace) -> int:
     inner += ["--", *command]
 
     command_str = shlex.join(inner)
-    wrapped_command = f"TRAIN_NOTIFY_TMUX_SESSION={shlex.quote(args.session)} {command_str}"
+    wrapped_command = f"TRAINPULSE_TMUX_SESSION={shlex.quote(args.session)} {command_str}"
     start_detached_session(args.session, wrapped_command, cwd=args.cwd)
     print(f"tmux task started: run_id={run_id} session={args.session}")
     return 0
@@ -352,7 +352,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="train-notify")
+    parser = argparse.ArgumentParser(prog="trainpulse")
     sub = parser.add_subparsers(dest="subcmd", required=True)
 
     def add_runtime_flags(p: argparse.ArgumentParser) -> None:

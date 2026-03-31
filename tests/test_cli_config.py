@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from train_notify.cli import _resolve_runtime
+from trainpulse.cli import _resolve_runtime
 
 
 class CliConfigTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class CliConfigTests(unittest.TestCase):
             cfg.write_text(
                 "\n".join(
                     [
-                        "[train_notify]",
+                        "[trainpulse]",
                         "webhook_url = 'https://file.example/hook'",
                         "message_type = 'post'",
                         "heartbeat_minutes = 30",
@@ -39,8 +39,8 @@ class CliConfigTests(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 {
-                    "TRAIN_NOTIFY_WEBHOOK_URL": "https://env.example/hook",
-                    "TRAIN_NOTIFY_MESSAGE_TYPE": "text",
+                    "TRAINPULSE_WEBHOOK_URL": "https://env.example/hook",
+                    "TRAINPULSE_MESSAGE_TYPE": "text",
                 },
                 clear=False,
             ):

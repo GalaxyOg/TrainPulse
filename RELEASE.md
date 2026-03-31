@@ -15,12 +15,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py" -
 
 ```bash
 python3 -m pip install -e .
-train-notify --help
+trainpulse --help
 ```
 
 ## 2) Version bump
 
-- Update version in `pyproject.toml` and `train_notify/__init__.py`.
+- Update version in `pyproject.toml` and `trainpulse/__init__.py`.
 - Add release notes (recommended in GitHub Release page).
 
 ## 3) Build artifacts

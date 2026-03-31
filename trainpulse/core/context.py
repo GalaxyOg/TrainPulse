@@ -108,7 +108,7 @@ def build_run_context(
         "git_commit": detect_git_commit(cwd_path),
         "cmd": format_cmd(cmd, redact_patterns),
         "log_path": str(Path(log_path).resolve()) if log_path else None,
-        "tmux_session": tmux_session or os.getenv("TRAIN_NOTIFY_TMUX_SESSION"),
+        "tmux_session": tmux_session or os.getenv("TRAINPULSE_TMUX_SESSION"),
         "pid": pid,
         "start_time": now_iso(),
     }

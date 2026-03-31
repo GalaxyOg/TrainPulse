@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from train_notify.core.models import Event
-from train_notify.core.runner import determine_final_event, normalize_exit_code
+from trainpulse.core.models import Event
+from trainpulse.core.runner import determine_final_event, normalize_exit_code
 
 
 class RunnerTests(unittest.TestCase):

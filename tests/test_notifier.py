@@ -4,7 +4,7 @@ import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 
-from train_notify.core.notifier import FeishuNotifier
+from trainpulse.core.notifier import FeishuNotifier
 
 
 def _payload() -> dict:
@@ -53,7 +53,7 @@ class NotifierTests(unittest.TestCase):
             ok = notifier.send(_payload())
         self.assertTrue(ok)
         output = buffer.getvalue()
-        self.assertIn("[train-notify][dry-run][FAILED]", output)
+        self.assertIn("[trainpulse][dry-run][FAILED]", output)
         self.assertIn("❌ [FAILED] Task Failed | demo", output)
 
     def test_send_without_webhook_prints_visible_warning(self) -> None:

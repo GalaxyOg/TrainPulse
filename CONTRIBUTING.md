@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to `train-notify`.
+Thanks for contributing to `TrainPulse`.
 
 ## Development Setup
 

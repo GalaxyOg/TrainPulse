@@ -1,8 +1,8 @@
-[train_notify]
+[trainpulse]
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 message_type = "post"
-store_path = "~/.local/state/train-notify/runs.db"
+store_path = "~/.local/state/trainpulse/runs.db"
 heartbeat_minutes = 30
 dry_run = false
 redact = ["(?i)(token=)\\S+"]
-# error_log_path = "~/.local/state/train-notify/error.log"
+# error_log_path = "~/.local/state/trainpulse/error.log"
