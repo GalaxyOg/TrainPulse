@@ -35,6 +35,7 @@ def should_notify_event(event: Event) -> bool:
         Event.SUCCEEDED,
         Event.FAILED,
         Event.INTERRUPTED,
+        Event.STOPPED,
     }
 
 
@@ -139,7 +140,7 @@ class CommandRunner:
             final_event = determine_final_event(exit_code, interrupted)
             end_time = now_iso()
             duration = round(time.monotonic() - started, 3)
-            self.store.finish_run(
+            updated = self.store.finish_run(
                 run_id=context["run_id"],
                 event=final_event.value,
                 exit_code=exit_code,
@@ -153,23 +154,26 @@ class CommandRunner:
                 duration=duration,
                 exit_code=exit_code,
             )
-            if should_notify_event(final_event):
+            if updated and should_notify_event(final_event):
                 self.notifier.send(payload)
             return exit_code
         except FileNotFoundError:
             end_time = now_iso()
             duration = round(time.monotonic() - started, 3)
             self.store.start_run(context)
-            self.store.finish_run(context["run_id"], Event.FAILED.value, 127, end_time, duration)
-            self.notifier.send(
-                dict(
-                    context,
-                    event=Event.FAILED.value,
-                    end_time=end_time,
-                    duration=duration,
-                    exit_code=127,
-                )
+            updated = self.store.finish_run(
+                context["run_id"], Event.FAILED.value, 127, end_time, duration
             )
+            if updated:
+                self.notifier.send(
+                    dict(
+                        context,
+                        event=Event.FAILED.value,
+                        end_time=end_time,
+                        duration=duration,
+                        exit_code=127,
+                    )
+                )
             return 127
         finally:
             for signum, handler in previous_handlers.items():

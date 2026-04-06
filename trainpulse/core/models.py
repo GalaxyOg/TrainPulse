@@ -10,6 +10,7 @@ class Event(str, Enum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     INTERRUPTED = "INTERRUPTED"
+    STOPPED = "STOPPED"
     HEARTBEAT = "HEARTBEAT"
 
 

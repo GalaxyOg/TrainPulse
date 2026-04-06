@@ -21,6 +21,7 @@ class FeishuNotifier:
         "SUCCEEDED": ("✅", "Task Succeeded"),
         "FAILED": ("❌", "Task Failed"),
         "INTERRUPTED": ("⛔", "Task Interrupted"),
+        "STOPPED": ("🛑", "Task Stopped"),
         "HEARTBEAT": ("💓", "Task Heartbeat"),
     }
 

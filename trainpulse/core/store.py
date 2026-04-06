@@ -113,42 +113,60 @@ class RunStore:
         exit_code: Optional[int],
         end_time: str,
         duration: float,
-    ) -> None:
+    ) -> bool:
         status = "SUCCEEDED" if event == "SUCCEEDED" else event
         with self._conn() as conn:
-            conn.execute(
+            result = conn.execute(
                 """
                 UPDATE runs
                 SET event = ?, status = ?, exit_code = ?, end_time = ?, duration = ?, updated_at = ?
-                WHERE run_id = ?
+                WHERE run_id = ? AND status = 'RUNNING'
                 """,
                 (event, status, exit_code, end_time, duration, _now(), run_id),
             )
+            return result.rowcount > 0
 
     def get_run(self, run_id: str) -> Optional[dict]:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
             return dict(row) if row else None
 
-    def list_runs(self, limit: int = 20, running_only: bool = False) -> list[dict]:
+    def list_runs(self, limit: Optional[int] = 20, running_only: bool = False) -> list[dict]:
         with self._conn() as conn:
             if running_only:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM runs
-                    WHERE status = 'RUNNING'
-                    ORDER BY updated_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
+                if limit is None:
+                    rows = conn.execute(
+                        """
+                        SELECT * FROM runs
+                        WHERE status = 'RUNNING'
+                        ORDER BY updated_at DESC
+                        """
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT * FROM runs
+                        WHERE status = 'RUNNING'
+                        ORDER BY updated_at DESC
+                        LIMIT ?
+                        """,
+                        (limit,),
+                    ).fetchall()
             else:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM runs
-                    ORDER BY updated_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
+                if limit is None:
+                    rows = conn.execute(
+                        """
+                        SELECT * FROM runs
+                        ORDER BY updated_at DESC
+                        """
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT * FROM runs
+                        ORDER BY updated_at DESC
+                        LIMIT ?
+                        """,
+                        (limit,),
+                    ).fetchall()
             return [dict(row) for row in rows]
