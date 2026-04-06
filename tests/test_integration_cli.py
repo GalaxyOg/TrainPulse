@@ -100,6 +100,11 @@ class CliIntegrationTests(unittest.TestCase):
             ],
             cwd=repo1,
         )
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        time.sleep(0.5)
+        with _WebhookHandler.lock:
+            self.assertEqual(_WebhookHandler.events, [])
+
         bad = self._run_cli(
             [
                 "run",
@@ -114,15 +119,28 @@ class CliIntegrationTests(unittest.TestCase):
             ],
             cwd=repo2,
         )
-        self.assertEqual(ok.returncode, 0, ok.stderr)
         self.assertEqual(bad.returncode, 3, bad.stderr)
 
         time.sleep(0.5)
-        combined = json.dumps(_WebhookHandler.events, ensure_ascii=False)
-        self.assertIn("repo_one", combined)
-        self.assertIn("repo_two", combined)
-        self.assertIn("SUCCEEDED", combined)
+        with _WebhookHandler.lock:
+            events = list(_WebhookHandler.events)
+        self.assertEqual(len(events), 1)
+        combined = json.dumps(events, ensure_ascii=False)
         self.assertIn("FAILED", combined)
+        self.assertIn("repo_two", combined)
+        self.assertNotIn("STARTED", combined)
+        self.assertNotIn("SUCCEEDED", combined)
+
+        conn = sqlite3.connect(str(self.store_path))
+        try:
+            rows = conn.execute(
+                "SELECT project, status FROM runs ORDER BY start_time ASC"
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], ("repo_one", "SUCCEEDED"))
+        self.assertEqual(rows[1], ("repo_two", "FAILED"))
 
     def test_run_interrupted(self) -> None:
         repo = self.root / "repo_interrupt"
@@ -156,8 +174,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertNotEqual(proc.returncode, 0)
 
         time.sleep(0.5)
-        all_events = json.dumps(_WebhookHandler.events, ensure_ascii=False)
+        with _WebhookHandler.lock:
+            all_events = json.dumps(_WebhookHandler.events, ensure_ascii=False)
         self.assertIn("INTERRUPTED", all_events)
+        self.assertNotIn("STARTED", all_events)
 
     def test_parallel_runs_unique_run_id(self) -> None:
         repo = self.root / "repo_parallel"

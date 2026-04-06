@@ -31,6 +31,7 @@ except ModuleNotFoundError:  # pragma: no cover
 DEFAULT_CONFIG_PATH = "~/.config/trainpulse/config.toml"
 DEFAULT_STORE_PATH = "~/.local/state/trainpulse/runs.db"
 DEFAULT_ERROR_LOG_PATH = "~/.local/state/trainpulse/notifier_errors.log"
+DEFAULT_HEARTBEAT_MINUTES = 30
 
 
 def _str_to_bool(value: Optional[str]) -> Optional[bool]:
@@ -152,6 +153,8 @@ def _resolve_runtime(args: argparse.Namespace) -> dict[str, Any]:
             heartbeat_minutes = None
     if heartbeat_minutes is None and isinstance(heartbeat_cfg, int):
         heartbeat_minutes = heartbeat_cfg
+    if not isinstance(heartbeat_minutes, int) or heartbeat_minutes <= 0:
+        heartbeat_minutes = DEFAULT_HEARTBEAT_MINUTES
 
     redact_cli = getattr(args, "redact", None)
     redact_env = env.get("TRAINPULSE_REDACT")
@@ -361,11 +364,16 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--message-type", choices=["text", "post"], default=None)
         p.add_argument("--store-path", default=None)
         p.add_argument("--error-log-path", default=None)
-        p.add_argument("--heartbeat-minutes", type=int, default=None)
+        p.add_argument(
+            "--heartbeat-minutes",
+            type=int,
+            default=None,
+            help="Silent liveness check interval in minutes (default: 30)",
+        )
         p.add_argument("--dry-run", action=argparse.BooleanOptionalAction, default=None)
         p.add_argument("--redact", action="append", default=None)
 
-    run_p = sub.add_parser("run", help="Run a command with notifications")
+    run_p = sub.add_parser("run", help="Run a command with abnormal-exit alerts")
     add_runtime_flags(run_p)
     run_p.add_argument("--job-name", default=None)
     run_p.add_argument("--log-path", default=None)
@@ -373,7 +381,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("cmd", nargs=argparse.REMAINDER)
     run_p.set_defaults(func=cmd_run)
 
-    tmux_p = sub.add_parser("tmux-run", help="Run command in detached tmux session")
+    tmux_p = sub.add_parser("tmux-run", help="Run command in detached tmux session with alerts")
     add_runtime_flags(tmux_p)
     tmux_p.add_argument("--session", required=True)
     tmux_p.add_argument("--job-name", default=None)

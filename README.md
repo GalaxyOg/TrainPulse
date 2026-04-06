@@ -4,7 +4,8 @@
 
 `trainpulse` 是一个训练任务通知包装器：运行任意命令并在关键事件发送飞书通知，同时保留原始退出码。
 
-支持事件：`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED` / `HEARTBEAT`
+通知事件：`FAILED` / `INTERRUPTED`
+运行记录事件（SQLite）：`STARTED` / `HEARTBEAT` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`
 
 时间说明：通知与运行记录默认使用 `UTC+8` 时区输出。
 
@@ -25,11 +26,11 @@ mkdir -p ~/.config/trainpulse
 cat > ~/.config/trainpulse/config.toml <<'EOF'
 [trainpulse]
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-heartbeat_minutes = 5
+heartbeat_minutes = 30
 message_type = "post"
 EOF
 
-# 2) 直接运行（无需每次传 webhook 和 heartbeat）
+# 2) 直接运行（无需每次传 webhook 和检查间隔）
 trainpulse run -- python train.py --config cfg.yaml
 ```
 
@@ -71,7 +72,7 @@ mkdir -p ~/.config/trainpulse
 cat > ~/.config/trainpulse/config.toml <<'EOF'
 [trainpulse]
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
-heartbeat_minutes = 5
+heartbeat_minutes = 30
 message_type = "post"
 store_path = "~/.local/state/trainpulse/runs.db"
 EOF
@@ -143,7 +144,7 @@ redact = ["(?i)(token=)\\S+"]
 
 ### 4) `heartbeat-minutes` 怎么调
 
-默认值是 **30 分钟**。
+默认值是 **30 分钟**，用于**静默健康检查**（更新本地运行状态），不会发送“正常进行中”通知。
 
 你可以通过三层来调：
 
@@ -158,18 +159,18 @@ redact = ["(?i)(token=)\\S+"]
 例子：
 
 ```bash
-# 临时把心跳改成每 10 分钟一次
+# 临时把静默检查改成每 10 分钟一次
 trainpulse run --heartbeat-minutes 10 -- python train.py
 
 # 当前 shell 临时改成 20 分钟
 export TRAINPULSE_HEARTBEAT_MINUTES=20
 trainpulse run -- python train.py
 
-# 长期固定成 5 分钟（推荐）
+# 长期固定成 30 分钟（推荐）
 mkdir -p ~/.config/trainpulse
 cat > ~/.config/trainpulse/config.toml <<'EOF'
 [trainpulse]
-heartbeat_minutes = 5
+heartbeat_minutes = 30
 EOF
 ```
 
@@ -187,26 +188,26 @@ trainpulse run / tmux-run
   │
   ├─ 解析 CLI / ENV / config.toml
   ├─ 生成 run_id / project / job / context
-  ├─ 发送 STARTED
+  ├─ 写入本地 STARTED 记录
   │
   ├─ 启动原始训练命令
   │    └─ 保留并等待真实退出码
   │
-  ├─ 运行中按 heartbeat_minutes 发送 HEARTBEAT
+  ├─ 运行中按 heartbeat_minutes 做静默检查并更新本地 HEARTBEAT
   │
-  └─ 结束后根据结果发送：
-       ├─ SUCCEEDED
-       ├─ FAILED
-       └─ INTERRUPTED
+  └─ 结束后根据结果：
+       ├─ SUCCEEDED（仅写入本地状态，不通知）
+       ├─ FAILED（发送通知）
+       └─ INTERRUPTED（发送通知）
 
-通知消息 ──> notifier ──> webhook
+失败/中断通知 ──> notifier ──> webhook
 运行记录 ──> store(SQLite)
 最终退出码 ──> 原样返回给调用方
 ```
 
 也就是说，它做的是：
 - 帮你包住原始训练命令
-- 在关键节点发通知
+- 在异常结束节点（失败/中断）发通知
 - 记录运行状态
 - 但**不吞掉原始退出码**
 
@@ -223,11 +224,11 @@ flowchart TD
     E --> F[Wrapped Training Process]
     E --> G[RunStore<br/>SQLite]
     E --> H[FeishuNotifier]
-    E --> I[Heartbeat Scheduler]
-    I --> H
+    E --> I[Silent Liveness Check]
+    I --> G
     F --> E
     E --> J[Final Event<br/>SUCCEEDED/FAILED/INTERRUPTED]
-    J --> H
+    J --> H[Notify only FAILED/INTERRUPTED]
     J --> G
     E --> K[Exit Code passthrough]
 ```
@@ -240,7 +241,7 @@ flowchart TD
 trainpulse run --dry-run -- python3 -c "print('hello')"
 ```
 
-预期：看到 `STARTED` + `SUCCEEDED`，返回码 `0`
+预期：返回码 `0`，默认不发送通知（`--dry-run` 下也不会打印 STARTED/SUCCEEDED）
 
 ### 失败路径（重点）
 
@@ -280,7 +281,7 @@ for e in H.events:
 PY
 ```
 
-预期：返回码 `3`，收到 `STARTED` + `FAILED`
+预期：返回码 `3`，收到 `FAILED`（不会收到 STARTED）
 
 ## 💬 推荐消息示例
 
@@ -304,6 +305,7 @@ PY
 ## 🛡️ 边界与安全
 
 - `SIGKILL` / 断电 / 宿主机崩溃不可捕获，无法即时发送中断通知
+- 当前版本没有可靠“卡死/假活着”判定信号，`heartbeat_minutes` 仅做静默存活检查，不会触发“疑似卡死”告警
 - 不要把真实 webhook 提交进仓库，优先使用 ENV 或本机配置
 - 通知发送失败会记录本地日志，但不会改变训练命令退出码
 

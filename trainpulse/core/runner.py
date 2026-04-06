@@ -29,6 +29,10 @@ def normalize_exit_code(exit_code: int) -> int:
     return exit_code
 
 
+def should_notify_event(event: Event) -> bool:
+    return event in {Event.FAILED, Event.INTERRUPTED}
+
+
 def _stream_pump(src: TextIO, dst: TextIO, log_fp: Optional[TextIO]) -> None:
     try:
         for line in iter(src.readline, ""):
@@ -94,7 +98,6 @@ class CommandRunner:
             context["pid"] = child_proc.pid
 
             self.store.start_run(context)
-            self.notifier.send(dict(context, event=Event.STARTED.value))
 
             for signum in (signal.SIGINT, signal.SIGTERM):
                 previous_handlers[signum] = signal.getsignal(signum)
@@ -121,7 +124,6 @@ class CommandRunner:
                     break
                 if heartbeat_deadline is not None and time.monotonic() >= heartbeat_deadline:
                     self.store.heartbeat(context["run_id"])
-                    self.notifier.send(dict(context, event=Event.HEARTBEAT.value))
                     heartbeat_deadline = time.monotonic() + self.heartbeat_seconds
                 time.sleep(0.2)
 
@@ -145,7 +147,8 @@ class CommandRunner:
                 duration=duration,
                 exit_code=exit_code,
             )
-            self.notifier.send(payload)
+            if should_notify_event(final_event):
+                self.notifier.send(payload)
             return exit_code
         except FileNotFoundError:
             end_time = now_iso()
