@@ -2,7 +2,7 @@
 webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-token"
 message_type = "post"
 store_path = "~/.local/state/trainpulse/runs.db"
-# Silent liveness check interval in minutes (no HEARTBEAT push notifications).
+# Silent local liveness check interval in minutes (HEARTBEAT is stored locally; no webhook push).
 heartbeat_minutes = 30
 dry_run = false
 redact = ["(?i)(token=)\\S+"]

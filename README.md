@@ -4,8 +4,8 @@
 
 `trainpulse` 是一个训练任务通知包装器：运行任意命令并在关键事件发送飞书通知，同时保留原始退出码。
 
-通知事件：`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`
-静默运行记录事件（SQLite）：`HEARTBEAT`（仅本地记录，不推送）
+通知事件：`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`（都会推送）
+静默运行记录事件（SQLite）：`HEARTBEAT`（仅本地记录，不推送；即使配置 webhook 也不会推送）
 
 时间说明：通知与运行记录默认使用 `UTC+8` 时区输出。
 
@@ -145,6 +145,7 @@ redact = ["(?i)(token=)\\S+"]
 ### 4) `heartbeat-minutes` 怎么调
 
 默认值是 **30 分钟**，用于**静默健康检查**（更新本地运行状态），不会发送“正常进行中”通知。
+即使配置了 `webhook_url`，`HEARTBEAT` 也不会触发飞书推送。
 
 你可以通过三层来调：
 
@@ -207,7 +208,8 @@ trainpulse run / tmux-run
 
 也就是说，它做的是：
 - 帮你包住原始训练命令
-- 在开始和结束节点发通知（不发送定时心跳通知）
+- 在开始和结束节点发通知（`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`）
+- 心跳只做本地存活记录（不发送定时 `HEARTBEAT` 通知）
 - 记录运行状态
 - 但**不吞掉原始退出码**
 
