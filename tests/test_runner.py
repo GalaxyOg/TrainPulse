@@ -17,8 +17,8 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(normalize_exit_code(3), 3)
 
     def test_should_notify_event(self) -> None:
-        self.assertFalse(should_notify_event(Event.STARTED))
-        self.assertFalse(should_notify_event(Event.SUCCEEDED))
+        self.assertTrue(should_notify_event(Event.STARTED))
+        self.assertTrue(should_notify_event(Event.SUCCEEDED))
         self.assertFalse(should_notify_event(Event.HEARTBEAT))
         self.assertTrue(should_notify_event(Event.FAILED))
         self.assertTrue(should_notify_event(Event.INTERRUPTED))

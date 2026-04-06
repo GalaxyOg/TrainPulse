@@ -30,7 +30,12 @@ def normalize_exit_code(exit_code: int) -> int:
 
 
 def should_notify_event(event: Event) -> bool:
-    return event in {Event.FAILED, Event.INTERRUPTED}
+    return event in {
+        Event.STARTED,
+        Event.SUCCEEDED,
+        Event.FAILED,
+        Event.INTERRUPTED,
+    }
 
 
 def _stream_pump(src: TextIO, dst: TextIO, log_fp: Optional[TextIO]) -> None:
@@ -98,6 +103,7 @@ class CommandRunner:
             context["pid"] = child_proc.pid
 
             self.store.start_run(context)
+            self.notifier.send(dict(context, event=Event.STARTED.value))
 
             for signum in (signal.SIGINT, signal.SIGTERM):
                 previous_handlers[signum] = signal.getsignal(signum)

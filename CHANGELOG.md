@@ -12,7 +12,7 @@ The format is inspired by Keep a Changelog and uses semantic versioning.
 - Improved Feishu message rendering with event emojis and more structured `post` content.
 - Improved default `text` message readability (multi-line key fields).
 - Reworked README with clearer configuration hierarchy and environment variable setup.
-- Notification policy changed to alert only on abnormal termination (`FAILED` / `INTERRUPTED`).
+- Notification policy keeps `STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`, while suppressing periodic HEARTBEAT pushes.
 - `heartbeat_minutes` is now a silent liveness-check interval (default `30`) used for local state updates only.
 
 ## [0.1.0] - 2026-03-31

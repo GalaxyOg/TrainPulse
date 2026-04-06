@@ -4,8 +4,8 @@
 
 `trainpulse` 是一个训练任务通知包装器：运行任意命令并在关键事件发送飞书通知，同时保留原始退出码。
 
-通知事件：`FAILED` / `INTERRUPTED`
-运行记录事件（SQLite）：`STARTED` / `HEARTBEAT` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`
+通知事件：`STARTED` / `SUCCEEDED` / `FAILED` / `INTERRUPTED`
+静默运行记录事件（SQLite）：`HEARTBEAT`（仅本地记录，不推送）
 
 时间说明：通知与运行记录默认使用 `UTC+8` 时区输出。
 
@@ -188,26 +188,26 @@ trainpulse run / tmux-run
   │
   ├─ 解析 CLI / ENV / config.toml
   ├─ 生成 run_id / project / job / context
-  ├─ 写入本地 STARTED 记录
+  ├─ 发送 STARTED
   │
   ├─ 启动原始训练命令
   │    └─ 保留并等待真实退出码
   │
   ├─ 运行中按 heartbeat_minutes 做静默检查并更新本地 HEARTBEAT
   │
-  └─ 结束后根据结果：
-       ├─ SUCCEEDED（仅写入本地状态，不通知）
-       ├─ FAILED（发送通知）
-       └─ INTERRUPTED（发送通知）
+  └─ 结束后根据结果发送：
+       ├─ SUCCEEDED
+       ├─ FAILED
+       └─ INTERRUPTED
 
-失败/中断通知 ──> notifier ──> webhook
+开始/结束通知 ──> notifier ──> webhook
 运行记录 ──> store(SQLite)
 最终退出码 ──> 原样返回给调用方
 ```
 
 也就是说，它做的是：
 - 帮你包住原始训练命令
-- 在异常结束节点（失败/中断）发通知
+- 在开始和结束节点发通知（不发送定时心跳通知）
 - 记录运行状态
 - 但**不吞掉原始退出码**
 
@@ -228,7 +228,8 @@ flowchart TD
     I --> G
     F --> E
     E --> J[Final Event<br/>SUCCEEDED/FAILED/INTERRUPTED]
-    J --> H[Notify only FAILED/INTERRUPTED]
+    E --> H[STARTED Notification]
+    J --> H[Final Notification (no HEARTBEAT)]
     J --> G
     E --> K[Exit Code passthrough]
 ```
@@ -241,7 +242,7 @@ flowchart TD
 trainpulse run --dry-run -- python3 -c "print('hello')"
 ```
 
-预期：返回码 `0`，默认不发送通知（`--dry-run` 下也不会打印 STARTED/SUCCEEDED）
+预期：看到 `STARTED` + `SUCCEEDED`，返回码 `0`
 
 ### 失败路径（重点）
 
@@ -281,7 +282,7 @@ for e in H.events:
 PY
 ```
 
-预期：返回码 `3`，收到 `FAILED`（不会收到 STARTED）
+预期：返回码 `3`，收到 `STARTED` + `FAILED`
 
 ## 💬 推荐消息示例
 

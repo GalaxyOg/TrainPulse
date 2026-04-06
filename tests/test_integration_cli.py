@@ -103,7 +103,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(ok.returncode, 0, ok.stderr)
         time.sleep(0.5)
         with _WebhookHandler.lock:
-            self.assertEqual(_WebhookHandler.events, [])
+            first_run_events = list(_WebhookHandler.events)
+        self.assertEqual(len(first_run_events), 2)
+        first_combined = json.dumps(first_run_events, ensure_ascii=False)
+        self.assertIn("STARTED", first_combined)
+        self.assertIn("SUCCEEDED", first_combined)
+        self.assertIn("repo_one", first_combined)
+        self.assertNotIn("HEARTBEAT", first_combined)
+
+        with _WebhookHandler.lock:
+            _WebhookHandler.events = []
 
         bad = self._run_cli(
             [
@@ -124,12 +133,13 @@ class CliIntegrationTests(unittest.TestCase):
         time.sleep(0.5)
         with _WebhookHandler.lock:
             events = list(_WebhookHandler.events)
-        self.assertEqual(len(events), 1)
+        self.assertEqual(len(events), 2)
         combined = json.dumps(events, ensure_ascii=False)
+        self.assertIn("STARTED", combined)
         self.assertIn("FAILED", combined)
         self.assertIn("repo_two", combined)
-        self.assertNotIn("STARTED", combined)
         self.assertNotIn("SUCCEEDED", combined)
+        self.assertNotIn("HEARTBEAT", combined)
 
         conn = sqlite3.connect(str(self.store_path))
         try:
@@ -176,8 +186,9 @@ class CliIntegrationTests(unittest.TestCase):
         time.sleep(0.5)
         with _WebhookHandler.lock:
             all_events = json.dumps(_WebhookHandler.events, ensure_ascii=False)
+        self.assertIn("STARTED", all_events)
         self.assertIn("INTERRUPTED", all_events)
-        self.assertNotIn("STARTED", all_events)
+        self.assertNotIn("HEARTBEAT", all_events)
 
     def test_parallel_runs_unique_run_id(self) -> None:
         repo = self.root / "repo_parallel"
