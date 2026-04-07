@@ -19,14 +19,14 @@ TrainPulse 是训练任务通知与运行状态管理工具。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GalaxyOg/TrainPulse/master/scripts/install_trainpulse_binary.sh | \
-  bash -s -- v0.2.1 GalaxyOg/TrainPulse
+  bash -s -- v0.2.2 GalaxyOg/TrainPulse
 ```
 
 ### 2) 下载二进制脚本安装
 
 ```bash
-# 例：安装 v0.2.1（需替换为你的 release tag）
-bash scripts/install_trainpulse_binary.sh v0.2.1
+# 例：安装 v0.2.2（需替换为你的 release tag）
+bash scripts/install_trainpulse_binary.sh v0.2.2
 ```
 
 ### 3) 本地构建
@@ -152,7 +152,7 @@ trainpulse version
 
 ```bash
 # 生成 linux/amd64 + linux/arm64 release 包
-bash scripts/build_release.sh v0.2.1
+bash scripts/build_release.sh v0.2.2
 ```
 
 产物位于 `dist/`。
