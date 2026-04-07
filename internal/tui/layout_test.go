@@ -31,7 +31,7 @@ func TestCalcViewLayoutModes(t *testing.T) {
 
 func TestViewFitsTerminalCanvas(t *testing.T) {
 	m := newModel(Options{
-		Version:    "0.2.2",
+		Version:    "0.2.3",
 		StorePath:  "/tmp/trainpulse.db",
 		ConfigPath: "/tmp/config.toml",
 	})
@@ -58,7 +58,7 @@ func TestViewFitsTerminalCanvas(t *testing.T) {
 
 func TestViewWithModalFitsTerminalCanvas(t *testing.T) {
 	m := newModel(Options{
-		Version:    "0.2.2",
+		Version:    "0.2.3",
 		StorePath:  "/tmp/trainpulse.db",
 		ConfigPath: "/tmp/config.toml",
 	})
