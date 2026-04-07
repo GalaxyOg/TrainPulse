@@ -33,7 +33,7 @@ type styles struct {
 func defaultStyles() styles {
 	border := lipgloss.RoundedBorder()
 	return styles{
-		root:        lipgloss.NewStyle().Padding(0, 1),
+		root:        lipgloss.NewStyle(),
 		header:      lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true),
 		headerMuted: lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
 		panel: lipgloss.NewStyle().

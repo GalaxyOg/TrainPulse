@@ -9,42 +9,140 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type layoutMode int
+
+const (
+	layoutModeTiny layoutMode = iota
+	layoutModeSingle
+	layoutModeDual
+)
+
+type viewLayout struct {
+	totalW  int
+	totalH  int
+	headerH int
+	statusH int
+	helpH   int
+	bodyH   int
+	mode    layoutMode
+	leftW   int
+	rightW  int
+	listH   int
+	detailH int
+}
+
 func (m model) View() string {
-	w := m.width
-	if w <= 0 {
-		w = 140
-	}
-	h := m.height
-	if h <= 0 {
-		h = 36
+	layout := calcViewLayout(m.width, m.height)
+	if layout.mode == layoutModeTiny {
+		return fitCanvas(m.styles.root.Render(m.renderTinyView(layout)), layout.totalW, layout.totalH)
 	}
 
-	header := m.renderHeader(w)
-	statusLine := m.renderStatusLine(w)
-	help := m.renderHelpBar(w)
+	header := m.renderHeader(layout.totalW)
+	statusLine := m.renderStatusLine(layout.totalW)
+	help := m.renderHelpBar(layout.totalW)
 
-	contentHeight := h - 5
-	if contentHeight < 12 {
-		contentHeight = 12
+	body := m.renderMainBody(layout)
+	if m.modal != modalNone {
+		body = m.renderModalBody(layout)
 	}
-	leftW := int(float64(w) * 0.54)
-	if leftW < 60 {
-		leftW = 60
-	}
-	rightW := w - leftW - 1
-	if rightW < 40 {
-		rightW = 40
-	}
-
-	listPane := m.renderListPane(leftW, contentHeight)
-	detailPane := m.renderDetailPane(rightW, contentHeight)
-	body := lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 
 	ui := lipgloss.JoinVertical(lipgloss.Left, header, body, statusLine, help)
-	if m.modal != modalNone {
-		ui = lipgloss.JoinVertical(lipgloss.Left, ui, m.renderModal(w))
+	return fitCanvas(m.styles.root.Render(ui), layout.totalW, layout.totalH)
+}
+
+func calcViewLayout(width, height int) viewLayout {
+	if width <= 0 {
+		width = 120
 	}
-	return m.styles.root.Render(ui)
+	if height <= 0 {
+		height = 30
+	}
+	layout := viewLayout{
+		totalW:  width,
+		totalH:  height,
+		headerH: 3,
+		statusH: 1,
+		helpH:   1,
+	}
+	layout.bodyH = layout.totalH - layout.headerH - layout.statusH - layout.helpH
+	if layout.totalW < 52 || layout.totalH < 8 || layout.bodyH < 3 {
+		layout.mode = layoutModeTiny
+		return layout
+	}
+	if layout.totalW >= 110 && layout.bodyH >= 10 {
+		gap := 1
+		minLeft := 38
+		minRight := 34
+		maxLeft := layout.totalW - gap - minRight
+		if maxLeft >= minLeft {
+			left := int(float64(layout.totalW) * 0.54)
+			if left < minLeft {
+				left = minLeft
+			}
+			if left > maxLeft {
+				left = maxLeft
+			}
+			layout.mode = layoutModeDual
+			layout.leftW = left
+			layout.rightW = layout.totalW - gap - left
+			return layout
+		}
+	}
+
+	layout.mode = layoutModeSingle
+	layout.leftW = layout.totalW
+	if layout.bodyH >= 11 {
+		layout.listH = (layout.bodyH * 3) / 5
+		if layout.listH < 6 {
+			layout.listH = 6
+		}
+		layout.detailH = layout.bodyH - layout.listH - 1
+		if layout.detailH < 4 {
+			layout.detailH = 0
+			layout.listH = layout.bodyH
+		}
+	} else {
+		layout.listH = layout.bodyH
+		layout.detailH = 0
+	}
+	return layout
+}
+
+func (m model) renderTinyView(layout viewLayout) string {
+	lines := []string{
+		m.styles.header.Render(trimRight(fmt.Sprintf("TrainPulse TUI v%s", m.opts.Version), layout.totalW)),
+		m.styles.headerMuted.Render(trimRight(fmt.Sprintf("terminal too small: %dx%d (need >= 52x8)", layout.totalW, layout.totalH), layout.totalW)),
+		m.styles.headerMuted.Render(trimRight("resize terminal for full dashboard", layout.totalW)),
+		trimRight(fmt.Sprintf("runs=%d  selected=%s", len(m.runs), dash(shortRunID(m.selectedRunID))), layout.totalW),
+		trimRight("[q] quit  [r] refresh  [/] search  [u] setup", layout.totalW),
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m model) renderMainBody(layout viewLayout) string {
+	switch layout.mode {
+	case layoutModeDual:
+		listPane := m.renderListPane(layout.leftW, layout.bodyH)
+		detailPane := m.renderDetailPane(layout.rightW, layout.bodyH)
+		gap := lipgloss.NewStyle().Width(1).Render("")
+		return fitCanvas(lipgloss.JoinHorizontal(lipgloss.Top, listPane, gap, detailPane), layout.totalW, layout.bodyH)
+	case layoutModeSingle:
+		listPane := m.renderListPane(layout.leftW, layout.listH)
+		if layout.detailH <= 0 {
+			return fitCanvas(listPane, layout.totalW, layout.bodyH)
+		}
+		detailPane := m.renderDetailPane(layout.leftW, layout.detailH)
+		gap := lipgloss.NewStyle().Width(layout.totalW).Render("")
+		return fitCanvas(lipgloss.JoinVertical(lipgloss.Left, listPane, gap, detailPane), layout.totalW, layout.bodyH)
+	default:
+		return fitCanvas("", layout.totalW, layout.bodyH)
+	}
+}
+
+func (m model) renderModalBody(layout viewLayout) string {
+	modal := m.renderModal(layout.totalW)
+	modal = clipLines(modal, layout.bodyH)
+	return lipgloss.Place(layout.totalW, layout.bodyH, lipgloss.Center, lipgloss.Center, modal)
 }
 
 func (m model) renderHeader(width int) string {
@@ -54,32 +152,43 @@ func (m model) renderHeader(width int) string {
 	if m.autoRefresh {
 		refreshSummary = "auto=" + m.opts.RefreshInterval.String()
 	}
-	left := fmt.Sprintf("TrainPulse TUI v%s", m.opts.Version)
-	meta := fmt.Sprintf("now=%s  store=%s  config=%s", now, shortenPath(m.opts.StorePath, 42), shortenPath(m.opts.ConfigPath, 42))
+	line1 := fmt.Sprintf("TrainPulse TUI v%s  now=%s  store=%s  config=%s",
+		m.opts.Version, now, shortenPath(m.opts.StorePath, 40), shortenPath(m.opts.ConfigPath, 40))
 	counts := fmt.Sprintf("running=%d failed=%d succeeded=%d interrupted=%d stopped=%d",
 		m.counts["RUNNING"], m.counts["FAILED"], m.counts["SUCCEEDED"], m.counts["INTERRUPTED"], m.counts["STOPPED"])
-	timeLine := fmt.Sprintf("last_failed=%s  last_active=%s", shortTime(dash(m.lastFailed)), shortTime(dash(m.lastActive)))
-	line1 := m.styles.header.Render(left) + "  " + m.styles.headerMuted.Render(meta)
-	line2 := m.styles.headerMuted.Render(filterSummary + "  " + refreshSummary)
-	line3 := m.styles.headerMuted.Render(counts + "  " + timeLine)
-	return fitWidth(lipgloss.JoinVertical(lipgloss.Left, line1, line2, line3), width)
+	line2 := fmt.Sprintf("%s  %s", filterSummary, refreshSummary)
+	line3 := fmt.Sprintf("%s  last_failed=%s  last_active=%s", counts, shortTime(dash(m.lastFailed)), shortTime(dash(m.lastActive)))
+	lines := []string{
+		m.styles.header.Render(trimRight(line1, width)),
+		m.styles.headerMuted.Render(trimRight(line2, width)),
+		m.styles.headerMuted.Render(trimRight(line3, width)),
+	}
+	return fitCanvas(strings.Join(lines, "\n"), width, 3)
 }
 
 func (m model) renderListPane(width, height int) string {
+	if width <= 4 || height <= 2 {
+		return fitCanvas("list", width, height)
+	}
+	frameW := m.styles.panel.GetHorizontalFrameSize()
+	frameH := m.styles.panel.GetVerticalFrameSize()
+	innerW := maxInt(1, width-frameW)
+	innerH := maxInt(1, height-frameH)
+
 	title := "Runs List"
 	if m.focus == focusList {
 		title = "Runs List [focus]"
 	}
-	chips := m.renderStatusChips(width - 4)
+	chips := m.renderStatusChips(innerW)
 	lines := []string{
-		m.styles.panelTitle.Render(title),
+		m.styles.panelTitle.Render(trimRight(title, innerW)),
 		chips,
-		m.styles.panelTitleDim.Render("st project           job            updated             dur   exit   run_id"),
+		m.styles.panelTitleDim.Render(trimRight("st project           job            updated             dur   exit   run_id", innerW)),
 	}
 
-	visible := height - 6
-	if visible < 4 {
-		visible = 4
+	visible := innerH - 4
+	if visible < 1 {
+		visible = 1
 	}
 	start := 0
 	if m.selected >= visible {
@@ -94,7 +203,7 @@ func (m model) renderListPane(width, height int) string {
 	}
 
 	if len(m.runs) == 0 {
-		lines = append(lines, m.styles.panelTitleDim.Render("no runs"))
+		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no runs", innerW)))
 	} else {
 		for i := start; i < end; i++ {
 			r := m.runs[i]
@@ -107,6 +216,7 @@ func (m model) renderListPane(width, height int) string {
 				exitCodeShort(r.ExitCode),
 				trimRight(shortRunID(r.RunID), 12),
 			)
+			row = trimRight(row, innerW)
 			if i == m.selected {
 				lines = append(lines, m.styles.rowSelected.Render(row))
 			} else {
@@ -115,44 +225,58 @@ func (m model) renderListPane(width, height int) string {
 		}
 	}
 	body := strings.Join(lines, "\n")
-	panel := m.styles.panel.Width(width).Height(height).Render(body)
+	panelStyle := m.styles.panel.Width(innerW).Height(innerH)
 	if m.focus == focusList {
-		panel = m.styles.focusOn.Width(width).Render(panel)
+		panelStyle = panelStyle.BorderForeground(lipgloss.Color("45"))
 	} else {
-		panel = m.styles.focusOff.Width(width).Render(panel)
+		panelStyle = panelStyle.BorderForeground(lipgloss.Color("238"))
 	}
-	return panel
+	return panelStyle.Render(body)
 }
 
 func (m model) renderDetailPane(width, height int) string {
+	if width <= 4 || height <= 2 {
+		return fitCanvas("detail", width, height)
+	}
+	frameW := m.styles.panel.GetHorizontalFrameSize()
+	frameH := m.styles.panel.GetVerticalFrameSize()
+	innerW := maxInt(1, width-frameW)
+	innerH := maxInt(1, height-frameH)
+
 	title := "Run Detail"
 	if m.focus == focusFilter {
 		title = "Run Detail [focus=filter]"
 	}
-	lines := []string{m.styles.panelTitle.Render(title)}
+	lines := []string{m.styles.panelTitle.Render(trimRight(title, innerW))}
 	r := m.selectedRun()
 	if r == nil {
-		lines = append(lines, m.styles.panelTitleDim.Render("no run selected"))
+		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no run selected", innerW)))
 	} else {
 		lines = append(lines,
-			m.kv("run_id", r.RunID),
-			m.kv("status/event", fmt.Sprintf("%s / %s", dash(r.Status), dash(r.Event))),
-			m.kv("project/job", fmt.Sprintf("%s / %s", dash(r.Project), dash(r.JobName))),
-			m.kv("host/cwd", fmt.Sprintf("%s / %s", dash(r.Host), dash(r.CWD))),
-			m.kv("git", fmt.Sprintf("%s@%s", dash(r.GitBranch), dash(r.GitCommit))),
-			m.kv("start/end", fmt.Sprintf("%s / %s", shortTime(r.StartTime), shortTime(dash(r.EndTime)))),
-			m.kv("updated/duration", fmt.Sprintf("%s / %.3fs", shortTime(r.UpdatedAt), r.Duration)),
-			m.kv("pid/exit", fmt.Sprintf("%s / %s", intPtr(r.PID), exitCodeShort(r.ExitCode))),
-			m.kv("tmux", dash(r.TmuxSession)),
-			m.kv("log", dash(r.LogPath)),
-			m.kv("heartbeat", dash(r.LastHeartbeat)),
-			m.kv("error_summary", dash(m.errorSummary[r.RunID])),
-			m.styles.panelTitleDim.Render("command:"),
+			trimRight(m.kv("run_id", r.RunID), innerW),
+			trimRight(m.kv("status/event", fmt.Sprintf("%s / %s", dash(r.Status), dash(r.Event))), innerW),
+			trimRight(m.kv("project/job", fmt.Sprintf("%s / %s", dash(r.Project), dash(r.JobName))), innerW),
+			trimRight(m.kv("host/cwd", fmt.Sprintf("%s / %s", dash(r.Host), dash(r.CWD))), innerW),
+			trimRight(m.kv("git", fmt.Sprintf("%s@%s", dash(r.GitBranch), dash(r.GitCommit))), innerW),
+			trimRight(m.kv("start/end", fmt.Sprintf("%s / %s", shortTime(r.StartTime), shortTime(dash(r.EndTime)))), innerW),
+			trimRight(m.kv("updated/duration", fmt.Sprintf("%s / %.3fs", shortTime(r.UpdatedAt), r.Duration)), innerW),
+			trimRight(m.kv("pid/exit", fmt.Sprintf("%s / %s", intPtr(r.PID), exitCodeShort(r.ExitCode))), innerW),
+			trimRight(m.kv("tmux", dash(r.TmuxSession)), innerW),
+			trimRight(m.kv("log", dash(r.LogPath)), innerW),
+			trimRight(m.kv("heartbeat", dash(r.LastHeartbeat)), innerW),
+			trimRight(m.kv("error_summary", dash(m.errorSummary[r.RunID])), innerW),
+			m.styles.panelTitleDim.Render(trimRight("command:", innerW)),
 		)
-		lines = append(lines, wrapText(r.Cmd, width-6)...)
+		for _, ln := range wrapText(r.Cmd, innerW-2) {
+			lines = append(lines, trimRight(ln, innerW))
+		}
 	}
 	body := strings.Join(lines, "\n")
-	return m.styles.panel.Width(width).Height(height).Render(body)
+	panelStyle := m.styles.panel.Width(innerW).Height(innerH)
+	if m.focus == focusFilter {
+		panelStyle = panelStyle.BorderForeground(lipgloss.Color("45"))
+	}
+	return panelStyle.Render(body)
 }
 
 func (m model) renderStatusLine(width int) string {
@@ -164,26 +288,26 @@ func (m model) renderStatusLine(width int) string {
 	if m.noticeIsErr {
 		prefix = "ERR"
 	}
-	content := fmt.Sprintf("[%s] %s", prefix, msg)
+	content := trimRight(fmt.Sprintf("[%s] %s", prefix, msg), width)
 	if m.noticeIsErr {
-		return fitWidth(m.styles.statusLine.Width(width).Render(m.styles.errText.Render(content)), width)
+		return m.styles.statusLine.Width(width).Render(m.styles.errText.Render(content))
 	}
-	return fitWidth(m.styles.statusLine.Width(width).Render(m.styles.okText.Render(content)), width)
+	return m.styles.statusLine.Width(width).Render(m.styles.okText.Render(content))
 }
 
 func (m model) renderHelpBar(width int) string {
 	help := "↑↓ move  ←→ panel/filter  Tab focus  Enter apply  r refresh  p auto  t 24h  / search(p:/j:)  s stop  a attach  l logs  c clear  x cleanup  u setup  d doctor  q quit"
-	return fitWidth(m.styles.helpBar.Width(width).Render(help), width)
+	return m.styles.helpBar.Width(width).Render(trimRight(help, width))
 }
 
 func (m model) renderModal(width int) string {
 	switch m.modal {
 	case modalConfirmStop:
 		body := "Stop selected run?\nrun_id=" + m.confirmRunID + "\n\n[y/Enter] confirm  [n/Esc] cancel"
-		return m.styles.modal.Width(min(width-4, 90)).Render(m.styles.modalTitle.Render("Confirm Stop") + "\n" + body)
+		return m.renderModalFrame(width, 90, m.styles.modalTitle.Render("Confirm Stop")+"\n"+body)
 	case modalSearch:
 		body := "Search syntax: p:<project> j:<job>\n\n" + m.searchInput + "_\n\n[Enter] apply  [Esc] cancel  [Ctrl+U] clear"
-		return m.styles.modal.Width(min(width-4, 90)).Render(m.styles.modalTitle.Render("Search Filter") + "\n" + body)
+		return m.renderModalFrame(width, 90, m.styles.modalTitle.Render("Search Filter")+"\n"+body)
 	case modalSetup:
 		lines := []string{m.styles.modalTitle.Render("Setup Config"), m.styles.modalHint.Render("Tab/Up/Down switch field, type to edit, Enter save at last field")}
 		for i, f := range m.setup.fields {
@@ -197,13 +321,13 @@ func (m model) renderModal(width int) string {
 			}
 		}
 		lines = append(lines, "", "[Enter] next/save  [Esc] cancel  [Ctrl+U] clear field")
-		return m.styles.modal.Width(min(width-4, 110)).Render(strings.Join(lines, "\n"))
+		return m.renderModalFrame(width, 110, strings.Join(lines, "\n"))
 	case modalInfo:
 		body := m.modalBody
 		if strings.TrimSpace(body) == "" {
 			body = "(empty)"
 		}
-		return m.styles.modal.Width(min(width-4, 110)).Render(m.styles.modalTitle.Render(m.modalTitle) + "\n" + body + "\n\n[Enter/Esc] close")
+		return m.renderModalFrame(width, 110, m.styles.modalTitle.Render(m.modalTitle)+"\n"+body+"\n\n[Enter/Esc] close")
 	case modalLogs:
 		page := m.logPageSize()
 		total := len(m.logLines)
@@ -223,7 +347,7 @@ func (m model) renderModal(width int) string {
 			"",
 			"[r] reload  [f] follow on/off  [+/-] tail lines  [PgUp/PgDn/Home/End/j/k] scroll  [Esc] close",
 		}, "\n")
-		return m.styles.modal.Width(min(width-4, 160)).Render(body)
+		return m.renderModalFrame(width, 160, body)
 	case modalCleanup:
 		lines := []string{
 			m.styles.modalTitle.Render("Cleanup Actions"),
@@ -238,10 +362,20 @@ func (m model) renderModal(width int) string {
 			lines = append(lines, prefix+opt)
 		}
 		lines = append(lines, "", "[Enter] execute  [Esc] cancel")
-		return m.styles.modal.Width(min(width-4, 80)).Render(strings.Join(lines, "\n"))
+		return m.renderModalFrame(width, 80, strings.Join(lines, "\n"))
 	default:
 		return ""
 	}
+}
+
+func (m model) renderModalFrame(totalWidth, maxOuter int, content string) string {
+	outer := min(totalWidth-2, maxOuter)
+	if outer < 20 {
+		outer = totalWidth
+	}
+	frameW := m.styles.modal.GetHorizontalFrameSize()
+	innerW := maxInt(1, outer-frameW)
+	return m.styles.modal.Width(innerW).Render(content)
 }
 
 func (m model) renderStatusChips(width int) string {
@@ -270,7 +404,7 @@ func (m model) renderStatusChips(width int) string {
 }
 
 func (m model) kv(k string, v string) string {
-	return m.styles.label.Render(trimRight(k, 14)+": ") + m.styles.value.Render(v)
+	return trimRight(k, 14) + ": " + v
 }
 
 func (m model) currentStatusLabel() string {
@@ -397,6 +531,24 @@ func fitWidth(s string, width int) string {
 		return s
 	}
 	return lipgloss.NewStyle().Width(width).Render(s)
+}
+
+func fitCanvas(s string, width, height int) string {
+	if width <= 0 || height <= 0 {
+		return s
+	}
+	return lipgloss.NewStyle().Width(width).Height(height).Render(s)
+}
+
+func clipLines(s string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) <= maxLines {
+		return s
+	}
+	return strings.Join(lines[:maxLines], "\n")
 }
 
 func wrapText(s string, width int) []string {
