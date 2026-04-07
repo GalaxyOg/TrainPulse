@@ -110,7 +110,7 @@ TUI 关键操作：
 - `/` 搜索（输入 `p:<project> j:<job>`）
 - `s` 停止选中 run（带确认）
 - `a` 查看 tmux attach 命令
-- `l` 打开日志弹层（tail / follow / reload）
+- `l` 打开日志弹层（tail / follow / reload / PgUp/PgDn/Home/End/j/k 滚动）
 - `c` 清空过滤条件
 - `x` 打开清理动作（清空错误日志 / reconcile orphaned runs）
 - `u` 打开 setup 配置向导

@@ -320,21 +320,27 @@ func (m model) handleModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, loadLogCmd(m.logRunID, m.logPath, m.logTailLines)
 		case "pgdown":
+			m.pauseLogFollowOnManualScroll()
 			m.logOffset = m.nextLogOffset(1 * m.logPageSize())
 			return m, nil
 		case "pgup":
+			m.pauseLogFollowOnManualScroll()
 			m.logOffset = m.nextLogOffset(-1 * m.logPageSize())
 			return m, nil
 		case "down", "j":
+			m.pauseLogFollowOnManualScroll()
 			m.logOffset = m.nextLogOffset(1)
 			return m, nil
 		case "up", "k":
+			m.pauseLogFollowOnManualScroll()
 			m.logOffset = m.nextLogOffset(-1)
 			return m, nil
 		case "home":
+			m.pauseLogFollowOnManualScroll()
 			m.logOffset = 0
 			return m, nil
 		case "end":
+			m.pauseLogFollowOnManualScroll()
 			m.logOffset = maxInt(0, len(m.logLines)-m.logPageSize())
 			return m, nil
 		}
@@ -424,6 +430,14 @@ func (m model) nextLogOffset(delta int) int {
 		next = maxOffset
 	}
 	return next
+}
+
+func (m *model) pauseLogFollowOnManualScroll() {
+	if !m.logFollow {
+		return
+	}
+	m.logFollow = false
+	m.setNotice("log follow paused (manual scroll)", false)
 }
 
 func maxInt(a, b int) int {

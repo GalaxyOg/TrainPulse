@@ -32,7 +32,7 @@ TrainPulse TUI 是本地训练任务运维控制台，不是替代 CLI 的唯一
 - `/` 搜索（`p:<project> j:<job>`）
 - `s` 停止选中 run（确认后执行）
 - `a` 查看 attach 命令
-- `l` 打开日志弹层（tail / follow / reload）
+- `l` 打开日志弹层（tail / follow / reload，支持 PgUp/PgDn/Home/End/j/k 滚动）
 - `c` 清空过滤条件
 - `x` 打开清理动作（clear filters / clear notifier error log / reconcile orphaned runs）
 - `u` 打开 setup 向导（TUI 内直接写配置）
