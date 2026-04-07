@@ -2,39 +2,52 @@
 
 ## 定位
 
-TrainPulse TUI 是运维辅助台，不是主入口。
+TrainPulse TUI 是本地训练任务运维控制台，不是替代 CLI 的唯一入口。
 
-- 主入口：CLI（可脚本化、稳定）
-- 辅助入口：TUI（人工排查与操作）
+- 主入口：CLI（可脚本化、可自动化）
+- 值守入口：TUI（人工观察、排障、运维操作）
 
-## MVP 能力
+## 布局模型
 
-- 最近 runs 列表
-- 状态筛选
-- 最近 24 小时筛选
-- 按 project/job 过滤
-- run 详情查看
-- stop run
-- 输出 tmux attach 命令
-- 输出日志路径
+- Header：版本、时间、store/config 摘要、刷新状态、过滤摘要、状态统计
+- Left / Runs List：可滚动任务列表，当前选中行高亮
+- Right / Run Detail：展示选中 run 的完整信息分组
+- Status Line：动作结果与错误反馈
+- Help Bar：固定显示快捷键
 
-## 当前交互
+## 交互模型
 
 进入：`trainpulse tui`
 
-常用命令：
+核心键位：
 
-- `setup` 初始化配置向导（可直接生成/覆盖 `~/.config/trainpulse/config.toml`）
-- `h` 帮助
-- `f running|failed|succeeded|interrupted|all|24h|clear24|project=<k>|job=<k>|clear`
-- `d <idx|run_id>`
-- `s <idx|run_id>`
-- `a <idx|run_id>`
-- `l <idx|run_id>`
-- `q`
+- `↑/↓` 列表选中移动
+- `Tab` 切换焦点（列表/过滤）
+- `←/→` 切换面板或过滤 chips
+- `Enter` 在过滤区应用筛选
+- `Esc` 关闭弹层
+- `r` 手动刷新
+- `p` 开/关自动刷新
+- `t` 切换最近 24h 过滤
+- `/` 搜索（`p:<project> j:<job>`）
+- `s` 停止选中 run（确认后执行）
+- `a` 查看 attach 命令
+- `l` 打开日志弹层（tail / follow / reload）
+- `c` 清空过滤条件
+- `x` 打开清理动作（clear filters / clear notifier error log / reconcile orphaned runs）
+- `u` 打开 setup 向导（TUI 内直接写配置）
+- `d` 运行 doctor 并展示结果
+- `q` 退出
 
-## 不在 MVP 范围
+## 当前范围（P0 + P1 已落地）
 
-- 富图形组件
-- 实时图表
-- 复杂权限与多用户协作
+- 多窗格导航
+- 状态高亮
+- 列表/详情联动
+- 搜索和筛选
+- stop/setup/doctor 动作入口
+- attach 提示
+- 日志 tail/follow 弹层
+- 清理动作弹层
+- 统计增强（last failed / last active）
+- 错误摘要展示（基于日志尾部提取）

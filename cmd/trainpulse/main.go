@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -667,83 +666,35 @@ func commandTUI(args []string) int {
 		}
 		return "run already finished", nil
 	}
-	setupFn := func() (string, error) {
-		return runSetupWizard()
+	doctorFn := func() (string, error) {
+		report := doctor.Run(rt)
+		lines := make([]string, 0, len(report.Items)+1)
+		for _, it := range report.Items {
+			flag := "OK"
+			if !it.OK {
+				flag = "FAIL"
+			}
+			lines = append(lines, fmt.Sprintf("[%s] %s: %s", flag, it.Name, it.Message))
+		}
+		if report.AllOK() {
+			lines = append(lines, "doctor summary: all checks passed")
+		}
+		return strings.Join(lines, "\n"), nil
 	}
-	if err := tuisvc.Run(st, stopFn, setupFn); err != nil {
+	if err := tuisvc.Run(tuisvc.Options{
+		Store:           st,
+		Stop:            stopFn,
+		Doctor:          doctorFn,
+		Version:         version.Version,
+		StorePath:       rt.StorePath,
+		ConfigPath:      rf.configPath,
+		ErrorLogPath:    rt.ErrorLogPath,
+		RefreshInterval: 3 * time.Second,
+	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error: tui failed: %v\n", err)
 		return 1
 	}
 	return 0
-}
-
-func runSetupWizard() (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	cfgPath := config.ExpandPath(config.DefaultConfigPath)
-	parent := filepath.Dir(cfgPath)
-	if err := os.MkdirAll(parent, 0o755); err != nil {
-		return "", fmt.Errorf("create config dir failed: %w", err)
-	}
-	if _, err := os.Stat(cfgPath); err == nil {
-		overwrite := promptWithDefault(reader, fmt.Sprintf("config exists at %s, overwrite? (yes/no)", cfgPath), "no")
-		ov := strings.ToLower(strings.TrimSpace(overwrite))
-		if ov != "y" && ov != "yes" {
-			return "setup canceled", nil
-		}
-	}
-
-	fmt.Println("TrainPulse setup wizard")
-	webhook := promptWithDefault(reader, "webhook_url (can be empty)", "")
-	messageType := strings.ToLower(promptWithDefault(reader, "message_type (text/post)", "post"))
-	if messageType != "post" && messageType != "text" {
-		messageType = "post"
-	}
-	storePath := promptWithDefault(reader, "store_path", config.DefaultStorePath)
-	errorLogPath := promptWithDefault(reader, "error_log_path", config.DefaultErrorLogPath)
-	heartbeatStr := promptWithDefault(reader, "heartbeat_minutes", "30")
-	heartbeat := 30
-	if v, err := strconv.Atoi(strings.TrimSpace(heartbeatStr)); err == nil && v > 0 {
-		heartbeat = v
-	}
-	dryRunStr := strings.ToLower(promptWithDefault(reader, "dry_run (true/false)", "false"))
-	dryRun := "false"
-	if dryRunStr == "true" || dryRunStr == "1" || dryRunStr == "yes" {
-		dryRun = "true"
-	}
-
-	content := strings.Join([]string{
-		"[trainpulse]",
-		fmt.Sprintf("webhook_url = %q", webhook),
-		fmt.Sprintf("message_type = %q", messageType),
-		fmt.Sprintf("store_path = %q", storePath),
-		fmt.Sprintf("error_log_path = %q", errorLogPath),
-		fmt.Sprintf("heartbeat_minutes = %d", heartbeat),
-		fmt.Sprintf("dry_run = %s", dryRun),
-		`redact = ["(?i)(token=)\\S+"]`,
-		"",
-	}, "\n")
-
-	if err := os.WriteFile(cfgPath, []byte(content), 0o644); err != nil {
-		return "", fmt.Errorf("write config failed: %w", err)
-	}
-	return fmt.Sprintf("config saved: %s\nnext: run `trainpulse doctor` then `trainpulse run -- <cmd...>`", cfgPath), nil
-}
-
-func promptWithDefault(reader *bufio.Reader, prompt string, defaultValue string) string {
-	if defaultValue == "" {
-		fmt.Printf("%s: ", prompt)
-	} else {
-		fmt.Printf("%s [%s]: ", prompt, defaultValue)
-	}
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return defaultValue
-	}
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return defaultValue
-	}
-	return line
 }
 
 func commandConfig(args []string) int {

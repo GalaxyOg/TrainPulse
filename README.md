@@ -95,10 +95,27 @@ trainpulse tui
 首次安装后可直接在 TUI 内完成配置：
 
 1. 启动 `trainpulse tui`
-2. 输入 `setup`
+2. 按 `u` 打开 setup 向导
 3. 按提示填写 `webhook_url/message_type/store_path/error_log_path/heartbeat_minutes/dry_run`
 4. 完成后执行 `trainpulse doctor`
 5. 然后执行 `trainpulse run -- <cmd...>`
+
+TUI 关键操作：
+
+- `↑/↓` 选择 run
+- `Tab` 切换焦点（列表/过滤区）
+- `←/→` 切换面板或过滤 chips
+- `Enter` 应用当前过滤
+- `r` 手动刷新，`p` 开/关自动刷新，`t` 切换最近 24h
+- `/` 搜索（输入 `p:<project> j:<job>`）
+- `s` 停止选中 run（带确认）
+- `a` 查看 tmux attach 命令
+- `l` 打开日志弹层（tail / follow / reload）
+- `c` 清空过滤条件
+- `x` 打开清理动作（清空错误日志 / reconcile orphaned runs）
+- `u` 打开 setup 配置向导
+- `d` 执行 doctor 并查看结果
+- `q` 退出
 
 ## 配置优先级
 
