@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
   echo "usage: $0 <version-tag> [repo]"
-  echo "example: $0 v0.2.3 GalaxyOg/TrainPulse"
+  echo "example: $0 v0.2.4 GalaxyOg/TrainPulse"
   exit 1
 fi
 
