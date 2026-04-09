@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/trainpulse/trainpulse/internal/store"
 )
 
 type layoutMode int
@@ -170,23 +171,21 @@ func (m model) renderListPane(width, height int) string {
 	if width <= 4 || height <= 2 {
 		return fitCanvas("list", width, height)
 	}
-	frameW := m.styles.panel.GetHorizontalFrameSize()
-	frameH := m.styles.panel.GetVerticalFrameSize()
-	innerW := maxInt(1, width-frameW)
-	innerH := maxInt(1, height-frameH)
+	styleW, styleH, contentW, contentH := resolveBox(m.styles.panel, width, height)
 
 	title := "Runs List"
 	if m.focus == focusList {
 		title = "Runs List [focus]"
 	}
-	chips := m.renderStatusChips(innerW)
+	chips := m.renderStatusChips(contentW)
+	headerLine := listHeaderLine(contentW)
 	lines := []string{
-		m.styles.panelTitle.Render(trimRight(title, innerW)),
+		m.styles.panelTitle.Render(trimRight(title, contentW)),
 		chips,
-		m.styles.panelTitleDim.Render(trimRight("st project           job            updated             dur   exit   run_id", innerW)),
+		m.styles.panelTitleDim.Render(trimRight(headerLine, contentW)),
 	}
 
-	visible := innerH - 4
+	visible := contentH - 4
 	if visible < 1 {
 		visible = 1
 	}
@@ -203,20 +202,12 @@ func (m model) renderListPane(width, height int) string {
 	}
 
 	if len(m.runs) == 0 {
-		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no runs", innerW)))
+		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no runs", contentW)))
 	} else {
 		for i := start; i < end; i++ {
 			r := m.runs[i]
-			row := fmt.Sprintf("%s %-16s %-14s %-18s %-5s %-6s %s",
-				padStatus(m.shortStatus(r.Status), 2),
-				trimRight(r.Project, 16),
-				trimRight(r.JobName, 14),
-				trimRight(shortTime(r.UpdatedAt), 18),
-				trimRight(durationShort(r.Duration), 5),
-				exitCodeShort(r.ExitCode),
-				trimRight(shortRunID(r.RunID), 12),
-			)
-			row = trimRight(row, innerW)
+			row := listRowLine(r, contentW)
+			row = trimRight(row, contentW)
 			if i == m.selected {
 				lines = append(lines, m.styles.rowSelected.Render(row))
 			} else {
@@ -225,58 +216,55 @@ func (m model) renderListPane(width, height int) string {
 		}
 	}
 	body := strings.Join(lines, "\n")
-	panelStyle := m.styles.panel.Width(innerW).Height(innerH)
+	panelStyle := m.styles.panel.Width(styleW).Height(styleH)
 	if m.focus == focusList {
 		panelStyle = panelStyle.BorderForeground(lipgloss.Color("45"))
 	} else {
 		panelStyle = panelStyle.BorderForeground(lipgloss.Color("238"))
 	}
-	return panelStyle.Render(body)
+	return fitCanvas(panelStyle.Render(body), width, height)
 }
 
 func (m model) renderDetailPane(width, height int) string {
 	if width <= 4 || height <= 2 {
 		return fitCanvas("detail", width, height)
 	}
-	frameW := m.styles.panel.GetHorizontalFrameSize()
-	frameH := m.styles.panel.GetVerticalFrameSize()
-	innerW := maxInt(1, width-frameW)
-	innerH := maxInt(1, height-frameH)
+	styleW, styleH, contentW, _ := resolveBox(m.styles.panel, width, height)
 
 	title := "Run Detail"
 	if m.focus == focusFilter {
 		title = "Run Detail [focus=filter]"
 	}
-	lines := []string{m.styles.panelTitle.Render(trimRight(title, innerW))}
+	lines := []string{m.styles.panelTitle.Render(trimRight(title, contentW))}
 	r := m.selectedRun()
 	if r == nil {
-		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no run selected", innerW)))
+		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no run selected", contentW)))
 	} else {
 		lines = append(lines,
-			trimRight(m.kv("run_id", r.RunID), innerW),
-			trimRight(m.kv("status/event", fmt.Sprintf("%s / %s", dash(r.Status), dash(r.Event))), innerW),
-			trimRight(m.kv("project/job", fmt.Sprintf("%s / %s", dash(r.Project), dash(r.JobName))), innerW),
-			trimRight(m.kv("host/cwd", fmt.Sprintf("%s / %s", dash(r.Host), dash(r.CWD))), innerW),
-			trimRight(m.kv("git", fmt.Sprintf("%s@%s", dash(r.GitBranch), dash(r.GitCommit))), innerW),
-			trimRight(m.kv("start/end", fmt.Sprintf("%s / %s", shortTime(r.StartTime), shortTime(dash(r.EndTime)))), innerW),
-			trimRight(m.kv("updated/duration", fmt.Sprintf("%s / %.3fs", shortTime(r.UpdatedAt), r.Duration)), innerW),
-			trimRight(m.kv("pid/exit", fmt.Sprintf("%s / %s", intPtr(r.PID), exitCodeShort(r.ExitCode))), innerW),
-			trimRight(m.kv("tmux", dash(r.TmuxSession)), innerW),
-			trimRight(m.kv("log", dash(r.LogPath)), innerW),
-			trimRight(m.kv("heartbeat", dash(r.LastHeartbeat)), innerW),
-			trimRight(m.kv("error_summary", dash(m.errorSummary[r.RunID])), innerW),
-			m.styles.panelTitleDim.Render(trimRight("command:", innerW)),
+			trimRight(m.kv("run_id", r.RunID), contentW),
+			trimRight(m.kv("status/event", fmt.Sprintf("%s / %s", dash(r.Status), dash(r.Event))), contentW),
+			trimRight(m.kv("project/job", fmt.Sprintf("%s / %s", dash(r.Project), dash(r.JobName))), contentW),
+			trimRight(m.kv("host/cwd", fmt.Sprintf("%s / %s", dash(r.Host), dash(r.CWD))), contentW),
+			trimRight(m.kv("git", fmt.Sprintf("%s@%s", dash(r.GitBranch), dash(r.GitCommit))), contentW),
+			trimRight(m.kv("start/end", fmt.Sprintf("%s / %s", shortTime(r.StartTime), shortTime(dash(r.EndTime)))), contentW),
+			trimRight(m.kv("updated/duration", fmt.Sprintf("%s / %.3fs", shortTime(r.UpdatedAt), r.Duration)), contentW),
+			trimRight(m.kv("pid/exit", fmt.Sprintf("%s / %s", intPtr(r.PID), exitCodeShort(r.ExitCode))), contentW),
+			trimRight(m.kv("tmux", dash(r.TmuxSession)), contentW),
+			trimRight(m.kv("log", dash(r.LogPath)), contentW),
+			trimRight(m.kv("heartbeat", dash(r.LastHeartbeat)), contentW),
+			trimRight(m.kv("error_summary", dash(m.errorSummary[r.RunID])), contentW),
+			m.styles.panelTitleDim.Render(trimRight("command:", contentW)),
 		)
-		for _, ln := range wrapText(r.Cmd, innerW-2) {
-			lines = append(lines, trimRight(ln, innerW))
+		for _, ln := range wrapText(r.Cmd, contentW) {
+			lines = append(lines, trimRight(ln, contentW))
 		}
 	}
 	body := strings.Join(lines, "\n")
-	panelStyle := m.styles.panel.Width(innerW).Height(innerH)
+	panelStyle := m.styles.panel.Width(styleW).Height(styleH)
 	if m.focus == focusFilter {
 		panelStyle = panelStyle.BorderForeground(lipgloss.Color("45"))
 	}
-	return panelStyle.Render(body)
+	return fitCanvas(panelStyle.Render(body), width, height)
 }
 
 func (m model) renderStatusLine(width int) string {
@@ -290,14 +278,14 @@ func (m model) renderStatusLine(width int) string {
 	}
 	content := trimRight(fmt.Sprintf("[%s] %s", prefix, msg), width)
 	if m.noticeIsErr {
-		return m.styles.statusLine.Width(width).Render(m.styles.errText.Render(content))
+		return renderBar(m.styles.statusLine, m.styles.errText, width, content)
 	}
-	return m.styles.statusLine.Width(width).Render(m.styles.okText.Render(content))
+	return renderBar(m.styles.statusLine, m.styles.okText, width, content)
 }
 
 func (m model) renderHelpBar(width int) string {
 	help := "↑↓ move  ←→ panel/filter  Tab focus  Enter apply  r refresh  p auto  t 24h  / search(p:/j:)  s stop  a attach  l logs  c clear  x cleanup  u setup  d doctor  q quit"
-	return m.styles.helpBar.Width(width).Render(trimRight(help, width))
+	return renderBar(m.styles.helpBar, m.styles.panelTitleDim, width, trimRight(help, width))
 }
 
 func (m model) renderModal(width int) string {
@@ -373,9 +361,12 @@ func (m model) renderModalFrame(totalWidth, maxOuter int, content string) string
 	if outer < 20 {
 		outer = totalWidth
 	}
-	frameW := m.styles.modal.GetHorizontalFrameSize()
-	innerW := maxInt(1, outer-frameW)
-	return m.styles.modal.Width(innerW).Render(content)
+	styleW, _, contentW, _ := resolveBox(m.styles.modal, outer, 1)
+	lines := strings.Split(content, "\n")
+	for i := range lines {
+		lines[i] = trimRight(lines[i], contentW)
+	}
+	return m.styles.modal.Width(styleW).Render(strings.Join(lines, "\n"))
 }
 
 func (m model) renderStatusChips(width int) string {
@@ -450,21 +441,21 @@ func containsStatus(list []string, target string) bool {
 	return false
 }
 
-func (m model) shortStatus(status string) string {
+func shortStatusCode(status string) string {
 	s := strings.ToUpper(strings.TrimSpace(status))
 	switch s {
 	case "RUNNING":
-		return m.styles.statusRunning.Render("RN")
+		return "RN"
 	case "FAILED":
-		return m.styles.statusFailed.Render("FL")
+		return "FL"
 	case "SUCCEEDED":
-		return m.styles.statusSuccess.Render("OK")
+		return "OK"
 	case "INTERRUPTED":
-		return m.styles.statusInterrupt.Render("IN")
+		return "IN"
 	case "STOPPED":
-		return m.styles.statusStopped.Render("SP")
+		return "SP"
 	default:
-		return m.styles.statusUnknown.Render("--")
+		return "--"
 	}
 }
 
@@ -517,13 +508,22 @@ func trimRight(s string, max int) string {
 	if max <= 0 {
 		return ""
 	}
-	if len(s) <= max {
+	if lipgloss.Width(s) <= max {
 		return s
 	}
 	if max <= 1 {
-		return s[:max]
+		return "…"
 	}
-	return s[:max-1] + "…"
+	target := max - 1
+	out := strings.Builder{}
+	for _, r := range s {
+		next := out.String() + string(r)
+		if lipgloss.Width(next) > target {
+			break
+		}
+		out.WriteRune(r)
+	}
+	return out.String() + "…"
 }
 
 func fitWidth(s string, width int) string {
@@ -570,7 +570,7 @@ func wrapText(s string, width int) []string {
 			current = w
 			continue
 		}
-		if len(current)+1+len(w) <= width {
+		if lipgloss.Width(current+" "+w) <= width {
 			current += " " + w
 			continue
 		}
@@ -594,6 +594,55 @@ func formatLogLines(shown []string, width int) string {
 	return strings.Join(out, "\n")
 }
 
+func renderBar(style lipgloss.Style, textStyle lipgloss.Style, outerW int, content string) string {
+	if outerW <= 0 {
+		return content
+	}
+	styleW, _, contentW, _ := resolveBox(style, outerW, 1)
+	trimmed := trimRight(content, contentW)
+	return fitCanvas(style.Width(styleW).Render(textStyle.Render(trimmed)), outerW, 1)
+}
+
+func listHeaderLine(innerW int) string {
+	switch {
+	case innerW >= 74:
+		return "st project           job            updated             dur   exit   run_id"
+	case innerW >= 56:
+		return "st project        job          updated           run_id"
+	default:
+		return "st project      run_id"
+	}
+}
+
+func listRowLine(r store.Run, innerW int) string {
+	switch {
+	case innerW >= 74:
+		return fmt.Sprintf("%-2s %-16s %-14s %-18s %-5s %-6s %-12s",
+			shortStatusCode(r.Status),
+			trimRight(r.Project, 16),
+			trimRight(r.JobName, 14),
+			trimRight(shortTime(r.UpdatedAt), 18),
+			trimRight(durationShort(r.Duration), 5),
+			trimRight(exitCodeShort(r.ExitCode), 6),
+			trimRight(shortRunID(r.RunID), 12),
+		)
+	case innerW >= 56:
+		return fmt.Sprintf("%-2s %-14s %-12s %-16s %-10s",
+			shortStatusCode(r.Status),
+			trimRight(r.Project, 14),
+			trimRight(r.JobName, 12),
+			trimRight(shortTime(r.UpdatedAt), 16),
+			trimRight(shortRunID(r.RunID), 10),
+		)
+	default:
+		return fmt.Sprintf("%-2s %-12s %-10s",
+			shortStatusCode(r.Status),
+			trimRight(r.Project, 12),
+			trimRight(shortRunID(r.RunID), 10),
+		)
+	}
+}
+
 func logWindow(lines []string, offset, page int) (start int, end int, shown []string) {
 	if page <= 0 {
 		page = 1
@@ -615,6 +664,22 @@ func logWindow(lines []string, offset, page int) (start int, end int, shown []st
 		end = total
 	}
 	return start, end, lines[start:end]
+}
+
+func resolveBox(style lipgloss.Style, outerW, outerH int) (styleW, styleH, contentW, contentH int) {
+	borderW := style.GetHorizontalFrameSize() - style.GetHorizontalPadding()
+	borderH := style.GetVerticalFrameSize() - style.GetVerticalPadding()
+	if borderW < 0 {
+		borderW = 0
+	}
+	if borderH < 0 {
+		borderH = 0
+	}
+	styleW = maxInt(1, outerW-borderW)
+	styleH = maxInt(1, outerH-borderH)
+	contentW = maxInt(1, styleW-style.GetHorizontalPadding())
+	contentH = maxInt(1, styleH-style.GetVerticalPadding())
+	return styleW, styleH, contentW, contentH
 }
 
 func padStatus(s string, width int) string {
