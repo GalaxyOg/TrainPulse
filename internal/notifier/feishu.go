@@ -40,19 +40,19 @@ func New(webhookURL, messageType string, dryRun bool, errorLogPath string) *Feis
 func eventStyle(event string) (string, string) {
 	switch event {
 	case "STARTED":
-		return "[START]", "Task Started"
+		return "🚀", "Task Started"
 	case "SUCCEEDED":
-		return "[OK]", "Task Succeeded"
+		return "✅", "Task Succeeded"
 	case "FAILED":
-		return "[FAIL]", "Task Failed"
+		return "❌", "Task Failed"
 	case "INTERRUPTED":
-		return "[INT]", "Task Interrupted"
+		return "⚠️", "Task Interrupted"
 	case "STOPPED":
-		return "[STOP]", "Task Stopped"
+		return "🛑", "Task Stopped"
 	case "HEARTBEAT":
-		return "[HB]", "Task Heartbeat"
+		return "💓", "Task Heartbeat"
 	default:
-		return "[EVT]", "Task Event"
+		return "ℹ️", "Task Event"
 	}
 }
 
@@ -82,39 +82,46 @@ func dirOf(path string) string {
 }
 
 func (n *FeishuNotifier) buildText(payload map[string]any) string {
+	lines := n.messageLines(payload)
+	return joinLines(lines)
+}
+
+func (n *FeishuNotifier) messageLines(payload map[string]any) []string {
 	event := asString(payload["event"])
-	tag, label := eventStyle(event)
+	icon, label := eventStyle(event)
 	lines := []string{
-		fmt.Sprintf("%s [%s] %s | %s", tag, event, label, asStringDefault(payload["project"], "-")),
-		fmt.Sprintf("job: %s", asStringDefault(payload["job_name"], "-")),
-		fmt.Sprintf("run_id: %s", asStringDefault(payload["run_id"], "-")),
-		fmt.Sprintf("host: %s", asStringDefault(payload["host"], "-")),
+		fmt.Sprintf("%s %s · %s", icon, label, asStringDefault(payload["project"], "-")),
+		fmt.Sprintf("%s event: %s", icon, defaultDash(event)),
+		fmt.Sprintf("📦 project: %s", asStringDefault(payload["project"], "-")),
+		fmt.Sprintf("🧩 job: %s", asStringDefault(payload["job_name"], "-")),
+		fmt.Sprintf("🆔 run_id: %s", asStringDefault(payload["run_id"], "-")),
+		fmt.Sprintf("🖥️ host: %s", asStringDefault(payload["host"], "-")),
 	}
 	if s := asString(payload["cwd"]); s != "" {
-		lines = append(lines, "cwd: "+s)
+		lines = append(lines, "📂 cwd: "+s)
 	}
 	if b := asString(payload["git_branch"]); b != "" || asString(payload["git_commit"]) != "" {
-		lines = append(lines, fmt.Sprintf("git: %s@%s", defaultDash(b), defaultDash(asString(payload["git_commit"]))))
+		lines = append(lines, fmt.Sprintf("🌿 git: %s@%s", defaultDash(b), defaultDash(asString(payload["git_commit"]))))
 	}
 	if s := asString(payload["start_time"]); s != "" {
-		lines = append(lines, "start: "+s)
+		lines = append(lines, "🕒 start: "+s)
 	}
 	if s := asString(payload["end_time"]); s != "" {
-		lines = append(lines, "end: "+s)
-	}
-	if ec := payload["exit_code"]; ec != nil {
-		lines = append(lines, fmt.Sprintf("exit_code: %v", ec))
+		lines = append(lines, "🕓 end: "+s)
 	}
 	if d := payload["duration"]; d != nil {
-		lines = append(lines, fmt.Sprintf("duration: %vs", d))
+		lines = append(lines, fmt.Sprintf("⏱️ duration: %vs", d))
+	}
+	if ec := payload["exit_code"]; ec != nil {
+		lines = append(lines, fmt.Sprintf("📉 exit_code: %v", ec))
 	}
 	if s := asString(payload["log_path"]); s != "" {
-		lines = append(lines, "log: "+s)
+		lines = append(lines, "📝 log: "+s)
 	}
 	if s := asString(payload["cmd"]); s != "" {
-		lines = append(lines, "cmd: "+s)
+		lines = append(lines, "💻 cmd: "+s)
 	}
-	return joinLines(lines)
+	return lines
 }
 
 func joinLines(lines []string) string {
@@ -153,43 +160,19 @@ func defaultDash(s string) string {
 
 func (n *FeishuNotifier) BuildMessage(payload map[string]any) map[string]any {
 	event := asString(payload["event"])
-	tag, label := eventStyle(event)
+	icon, label := eventStyle(event)
 	if n.MessageType == "post" {
-		content := []any{
-			[]any{map[string]any{"tag": "text", "text": fmt.Sprintf("%s event: %s", tag, event)}},
-			[]any{map[string]any{"tag": "text", "text": fmt.Sprintf("project: %s", asStringDefault(payload["project"], "-"))}},
-			[]any{map[string]any{"tag": "text", "text": fmt.Sprintf("job: %s", asStringDefault(payload["job_name"], "-"))}},
-			[]any{map[string]any{"tag": "text", "text": fmt.Sprintf("run_id: %s", asStringDefault(payload["run_id"], "-"))}},
-			[]any{map[string]any{"tag": "text", "text": fmt.Sprintf("host: %s", asStringDefault(payload["host"], "-"))}},
-			[]any{map[string]any{"tag": "text", "text": fmt.Sprintf("cwd: %s", asStringDefault(payload["cwd"], "-"))}},
-		}
-		if b := asString(payload["git_branch"]); b != "" || asString(payload["git_commit"]) != "" {
-			content = append(content, []any{map[string]any{"tag": "text", "text": fmt.Sprintf("git: %s@%s", defaultDash(b), defaultDash(asString(payload["git_commit"])))}})
-		}
-		if s := asString(payload["start_time"]); s != "" {
-			content = append(content, []any{map[string]any{"tag": "text", "text": "start: " + s}})
-		}
-		if s := asString(payload["end_time"]); s != "" {
-			content = append(content, []any{map[string]any{"tag": "text", "text": "end: " + s}})
-		}
-		if d := payload["duration"]; d != nil {
-			content = append(content, []any{map[string]any{"tag": "text", "text": fmt.Sprintf("duration: %vs", d)}})
-		}
-		if ec := payload["exit_code"]; ec != nil {
-			content = append(content, []any{map[string]any{"tag": "text", "text": fmt.Sprintf("exit_code: %v", ec)}})
-		}
-		if s := asString(payload["log_path"]); s != "" {
-			content = append(content, []any{map[string]any{"tag": "text", "text": "log: " + s}})
-		}
-		if s := asString(payload["cmd"]); s != "" {
-			content = append(content, []any{map[string]any{"tag": "text", "text": "cmd: " + s}})
+		lines := n.messageLines(payload)
+		content := make([]any, 0, len(lines))
+		for _, line := range lines {
+			content = append(content, []any{map[string]any{"tag": "text", "text": line}})
 		}
 		return map[string]any{
 			"msg_type": "post",
 			"content": map[string]any{
 				"post": map[string]any{
 					"zh_cn": map[string]any{
-						"title":   fmt.Sprintf("%s %s · %s", tag, label, asStringDefault(payload["project"], "-")),
+						"title":   fmt.Sprintf("%s %s · %s", icon, label, asStringDefault(payload["project"], "-")),
 						"content": content,
 					},
 				},

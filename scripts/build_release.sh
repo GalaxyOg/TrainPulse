@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-v0.2.4}"
+VERSION="${1:-v0.2.5}"
 OUT_DIR="dist"
 APP="trainpulse"
 

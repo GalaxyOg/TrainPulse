@@ -33,7 +33,7 @@ func TestCalcViewLayoutModes(t *testing.T) {
 
 func TestViewFitsTerminalCanvas(t *testing.T) {
 	m := newModel(Options{
-		Version:    "0.2.4",
+		Version:    "0.2.5",
 		StorePath:  "/tmp/trainpulse.db",
 		ConfigPath: "/tmp/config.toml",
 	})
@@ -60,7 +60,7 @@ func TestViewFitsTerminalCanvas(t *testing.T) {
 
 func TestViewWithModalFitsTerminalCanvas(t *testing.T) {
 	m := newModel(Options{
-		Version:    "0.2.4",
+		Version:    "0.2.5",
 		StorePath:  "/tmp/trainpulse.db",
 		ConfigPath: "/tmp/config.toml",
 	})
@@ -80,7 +80,7 @@ func TestViewWithModalFitsTerminalCanvas(t *testing.T) {
 }
 
 func TestPaneWidthRespected(t *testing.T) {
-	m := newModel(Options{Version: "0.2.4"})
+	m := newModel(Options{Version: "0.2.5"})
 	layout := calcViewLayout(140, 36)
 	if layout.mode != layoutModeDual {
 		t.Fatalf("expected dual mode for test")
@@ -96,7 +96,7 @@ func TestPaneWidthRespected(t *testing.T) {
 }
 
 func TestJoinedWidthRespected(t *testing.T) {
-	m := newModel(Options{Version: "0.2.4"})
+	m := newModel(Options{Version: "0.2.5"})
 	for _, size := range []struct {
 		w int
 		h int
@@ -116,7 +116,7 @@ func TestJoinedWidthRespected(t *testing.T) {
 func TestLongFieldsNoOverflow(t *testing.T) {
 	exit := 137
 	pid := 12345
-	m := newModel(Options{Version: "0.2.4"})
+	m := newModel(Options{Version: "0.2.5"})
 	m.runs = []store.Run{
 		{
 			RunID:         "run_very_long_identifier_abcdefghijklmnopqrstuvwxyz_0123456789",
@@ -149,7 +149,7 @@ func TestLongFieldsNoOverflow(t *testing.T) {
 
 func TestResizeStability(t *testing.T) {
 	m := newModel(Options{
-		Version:    "0.2.4",
+		Version:    "0.2.5",
 		StorePath:  "/tmp/trainpulse.db",
 		ConfigPath: "/tmp/config.toml",
 	})
