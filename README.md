@@ -24,21 +24,21 @@ TrainPulse 是训练任务通知与运行状态管理工具。
 ```bash
 export GOPROXY=https://goproxy.cn,direct
 export GOSUMDB=sum.golang.google.cn
-GOBIN="$HOME/.local/bin" go install github.com/trainpulse/trainpulse/cmd/trainpulse@v0.2.5
+GOBIN="$HOME/.local/bin" go install github.com/trainpulse/trainpulse/cmd/trainpulse@v0.2.6
 ```
 
 ### 2) 一键二进制安装（网络稳定时）
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GalaxyOg/TrainPulse/master/scripts/install_trainpulse_binary.sh | \
-  bash -s -- v0.2.5 GalaxyOg/TrainPulse
+  bash -s -- v0.2.6 GalaxyOg/TrainPulse
 ```
 
 ### 3) 本地脚本安装二进制
 
 ```bash
-# 例：安装 v0.2.5（需替换为你的 release tag）
-bash scripts/install_trainpulse_binary.sh v0.2.5
+# 例：安装 v0.2.6（需替换为你的 release tag）
+bash scripts/install_trainpulse_binary.sh v0.2.6
 ```
 
 ### 4) 源码构建安装
@@ -143,7 +143,8 @@ TUI 关键操作：
 
 - `↑/↓` 选择 run
 - `Tab` 切换焦点（列表/过滤区）
-- `←/→` 切换面板或过滤 chips
+- `←/→` 只切换左右面板焦点（List/Detail）
+- `[` / `]` 全局切换状态 chips（all/running/failed/...）
 - `Enter` 应用当前过滤
 - `r` 手动刷新，`p` 开/关自动刷新，`t` 切换最近 24h
 - `/` 搜索（输入 `p:<project> j:<job>`）
@@ -176,7 +177,7 @@ TUI 关键操作：
 
 ```bash
 # 生成 linux/amd64 + linux/arm64 release 包
-bash scripts/build_release.sh v0.2.5
+bash scripts/build_release.sh v0.2.6
 ```
 
 产物位于 `dist/`。

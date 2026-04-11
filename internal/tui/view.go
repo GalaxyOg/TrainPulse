@@ -155,16 +155,43 @@ func (m model) renderHeader(width int) string {
 	}
 	line1 := fmt.Sprintf("TrainPulse TUI v%s  now=%s  store=%s  config=%s",
 		m.opts.Version, now, shortenPath(m.opts.StorePath, 40), shortenPath(m.opts.ConfigPath, 40))
-	counts := fmt.Sprintf("running=%d failed=%d succeeded=%d interrupted=%d stopped=%d",
-		m.counts["RUNNING"], m.counts["FAILED"], m.counts["SUCCEEDED"], m.counts["INTERRUPTED"], m.counts["STOPPED"])
 	line2 := fmt.Sprintf("%s  %s", filterSummary, refreshSummary)
-	line3 := fmt.Sprintf("%s  last_failed=%s  last_active=%s", counts, shortTime(dash(m.lastFailed)), shortTime(dash(m.lastActive)))
+	line3 := m.renderCountSummary(width)
 	lines := []string{
 		m.styles.header.Render(trimRight(line1, width)),
 		m.styles.headerMuted.Render(trimRight(line2, width)),
-		m.styles.headerMuted.Render(trimRight(line3, width)),
+		line3,
 	}
 	return fitCanvas(strings.Join(lines, "\n"), width, 3)
+}
+
+func (m model) renderCountSummary(width int) string {
+	countParts := []string{
+		m.styles.statusRunning.Render(fmt.Sprintf("running=%d", m.counts["RUNNING"])),
+		m.styles.statusFailed.Render(fmt.Sprintf("failed=%d", m.counts["FAILED"])),
+		m.styles.statusSuccess.Render(fmt.Sprintf("succeeded=%d", m.counts["SUCCEEDED"])),
+		m.styles.statusInterrupt.Render(fmt.Sprintf("interrupted=%d", m.counts["INTERRUPTED"])),
+		m.styles.statusStopped.Render(fmt.Sprintf("stopped=%d", m.counts["STOPPED"])),
+	}
+	if width < 72 {
+		return strings.Join([]string{
+			m.styles.statusRunning.Render(fmt.Sprintf("rn=%d", m.counts["RUNNING"])),
+			m.styles.statusFailed.Render(fmt.Sprintf("fl=%d", m.counts["FAILED"])),
+			m.styles.statusSuccess.Render(fmt.Sprintf("ok=%d", m.counts["SUCCEEDED"])),
+			m.styles.statusInterrupt.Render(fmt.Sprintf("in=%d", m.counts["INTERRUPTED"])),
+			m.styles.statusStopped.Render(fmt.Sprintf("sp=%d", m.counts["STOPPED"])),
+		}, "  ")
+	}
+	line := strings.Join(countParts, "  ")
+	if width >= 118 {
+		tail := m.styles.headerMuted.Render(fmt.Sprintf("  last_failed=%s  last_active=%s", shortTime(dash(m.lastFailed)), shortTime(dash(m.lastActive))))
+		return line + tail
+	}
+	if width >= 92 {
+		tail := m.styles.headerMuted.Render(fmt.Sprintf("  last_active=%s", shortTime(dash(m.lastActive))))
+		return line + tail
+	}
+	return line
 }
 
 func (m model) renderListPane(width, height int) string {
@@ -182,7 +209,7 @@ func (m model) renderListPane(width, height int) string {
 	lines := []string{
 		m.styles.panelTitle.Render(trimRight(title, contentW)),
 		chips,
-		m.styles.panelTitleDim.Render(trimRight(headerLine, contentW)),
+		m.styles.listHeader.Render(trimRight(headerLine, contentW)),
 	}
 
 	visible := contentH - 4
@@ -233,7 +260,7 @@ func (m model) renderDetailPane(width, height int) string {
 
 	title := "Run Detail"
 	if m.focus == focusFilter {
-		title = "Run Detail [focus=filter]"
+		title = "Run Detail [focus]"
 	}
 	lines := []string{m.styles.panelTitle.Render(trimRight(title, contentW))}
 	r := m.selectedRun()
@@ -241,18 +268,18 @@ func (m model) renderDetailPane(width, height int) string {
 		lines = append(lines, m.styles.panelTitleDim.Render(trimRight("no run selected", contentW)))
 	} else {
 		lines = append(lines,
-			trimRight(m.kv("run_id", r.RunID), contentW),
-			trimRight(m.kv("status/event", fmt.Sprintf("%s / %s", dash(r.Status), dash(r.Event))), contentW),
-			trimRight(m.kv("project/job", fmt.Sprintf("%s / %s", dash(r.Project), dash(r.JobName))), contentW),
-			trimRight(m.kv("host/cwd", fmt.Sprintf("%s / %s", dash(r.Host), dash(r.CWD))), contentW),
-			trimRight(m.kv("git", fmt.Sprintf("%s@%s", dash(r.GitBranch), dash(r.GitCommit))), contentW),
-			trimRight(m.kv("start/end", fmt.Sprintf("%s / %s", shortTime(r.StartTime), shortTime(dash(r.EndTime)))), contentW),
-			trimRight(m.kv("updated/duration", fmt.Sprintf("%s / %.3fs", shortTime(r.UpdatedAt), r.Duration)), contentW),
-			trimRight(m.kv("pid/exit", fmt.Sprintf("%s / %s", intPtr(r.PID), exitCodeShort(r.ExitCode))), contentW),
-			trimRight(m.kv("tmux", dash(r.TmuxSession)), contentW),
-			trimRight(m.kv("log", dash(r.LogPath)), contentW),
-			trimRight(m.kv("heartbeat", dash(r.LastHeartbeat)), contentW),
-			trimRight(m.kv("error_summary", dash(m.errorSummary[r.RunID])), contentW),
+			m.kv(contentW, "run_id", r.RunID),
+			m.kv(contentW, "status/event", fmt.Sprintf("%s / %s", dash(r.Status), dash(r.Event))),
+			m.kv(contentW, "project/job", fmt.Sprintf("%s / %s", dash(r.Project), dash(r.JobName))),
+			m.kv(contentW, "host/cwd", fmt.Sprintf("%s / %s", dash(r.Host), dash(r.CWD))),
+			m.kv(contentW, "git", fmt.Sprintf("%s@%s", dash(r.GitBranch), dash(r.GitCommit))),
+			m.kv(contentW, "start/end", fmt.Sprintf("%s / %s", shortTime(r.StartTime), shortTime(dash(r.EndTime)))),
+			m.kv(contentW, "updated/duration", fmt.Sprintf("%s / %.3fs", shortTime(r.UpdatedAt), r.Duration)),
+			m.kv(contentW, "pid/exit", fmt.Sprintf("%s / %s", intPtr(r.PID), exitCodeShort(r.ExitCode))),
+			m.kv(contentW, "tmux", dash(r.TmuxSession)),
+			m.kv(contentW, "log", dash(r.LogPath)),
+			m.kv(contentW, "heartbeat", dash(r.LastHeartbeat)),
+			m.kv(contentW, "error_summary", dash(m.errorSummary[r.RunID])),
 			m.styles.panelTitleDim.Render(trimRight("command:", contentW)),
 		)
 		for _, ln := range wrapText(r.Cmd, contentW) {
@@ -284,7 +311,7 @@ func (m model) renderStatusLine(width int) string {
 }
 
 func (m model) renderHelpBar(width int) string {
-	help := "↑↓ move  ←→ panel/filter  Tab focus  Enter apply  r refresh  p auto  t 24h  / search(p:/j:)  s stop  a attach  l logs  c clear  x cleanup  u setup  d doctor  q quit"
+	help := "↑↓ move  ←→ pane focus  [ and ] status chip  Tab focus  r refresh  p auto  t 24h  / search(p:/j:)  s stop  a attach  l logs  c clear  x cleanup  u setup  d doctor  q quit"
 	return renderBar(m.styles.helpBar, m.styles.panelTitleDim, width, trimRight(help, width))
 }
 
@@ -372,30 +399,57 @@ func (m model) renderModalFrame(totalWidth, maxOuter int, content string) string
 func (m model) renderStatusChips(width int) string {
 	items := make([]string, 0, len(m.statusChips)+2)
 	for i, chip := range m.statusChips {
-		label := " " + chip + " "
-		style := m.styles.panelTitleDim
+		label := "[" + chip + "]"
+		style := m.statusChipStyle(chip)
+		selected := containsStatus(m.filterStatuses, chipToStatus(chip)) || (chip == "all" && len(m.filterStatuses) == 0)
+		if selected {
+			style = style.Bold(true).Underline(true)
+		}
 		if i == m.chipIndex {
-			style = m.styles.panelTitle
+			style = style.Background(lipgloss.Color("238")).Foreground(lipgloss.Color("231")).Bold(true)
 		}
-		if containsStatus(m.filterStatuses, chipToStatus(chip)) || (chip == "all" && len(m.filterStatuses) == 0) {
-			style = style.Bold(true)
-		}
-		items = append(items, style.Render(label))
+		items = append(items, style.Render(" "+label+" "))
 	}
 	if m.since24h {
-		items = append(items, m.styles.statusInterrupt.Render(" 24h "))
+		items = append(items, m.styles.statusInterrupt.Background(lipgloss.Color("238")).Render(" [24h] "))
 	}
 	if m.projectQuery != "" {
-		items = append(items, m.styles.okText.Render(" p:"+m.projectQuery+" "))
+		items = append(items, m.styles.okText.Background(lipgloss.Color("238")).Render(" p:"+m.projectQuery+" "))
 	}
 	if m.jobQuery != "" {
-		items = append(items, m.styles.okText.Render(" j:"+m.jobQuery+" "))
+		items = append(items, m.styles.okText.Background(lipgloss.Color("238")).Render(" j:"+m.jobQuery+" "))
 	}
 	return fitWidth(strings.Join(items, ""), width)
 }
 
-func (m model) kv(k string, v string) string {
-	return trimRight(k, 14) + ": " + v
+func (m model) statusChipStyle(chip string) lipgloss.Style {
+	switch chip {
+	case "running":
+		return m.styles.statusRunning
+	case "failed":
+		return m.styles.statusFailed
+	case "succeeded":
+		return m.styles.statusSuccess
+	case "interrupted":
+		return m.styles.statusInterrupt
+	case "stopped":
+		return m.styles.statusStopped
+	default:
+		return m.styles.panelTitle
+	}
+}
+
+func (m model) kv(width int, k string, v string) string {
+	if width <= 0 {
+		return ""
+	}
+	label := trimRight(k, 14) + ": "
+	labelW := lipgloss.Width(label)
+	if labelW >= width {
+		return m.styles.label.Render(trimRight(label, width))
+	}
+	value := trimRight(v, width-labelW)
+	return m.styles.label.Render(label) + m.styles.value.Render(value)
 }
 
 func (m model) currentStatusLabel() string {

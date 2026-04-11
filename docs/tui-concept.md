@@ -23,7 +23,8 @@ TrainPulse TUI 是本地训练任务运维控制台，不是替代 CLI 的唯一
 
 - `↑/↓` 列表选中移动
 - `Tab` 切换焦点（列表/过滤）
-- `←/→` 切换面板或过滤 chips
+- `←/→` 只切换左右面板焦点（List/Detail）
+- `[` / `]` 全局切换状态 chips（all/running/failed/...）
 - `Enter` 在过滤区应用筛选
 - `Esc` 关闭弹层
 - `r` 手动刷新

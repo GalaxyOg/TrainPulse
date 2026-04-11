@@ -109,22 +109,38 @@ func (m model) handleMainKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "left":
 		if m.focus == focusFilter {
-			if m.chipIndex > 0 {
-				m.chipIndex--
-			}
-		} else {
-			m.focus = focusFilter
+			m.focus = focusList
 		}
 		return m, nil
 	case "right":
-		if m.focus == focusFilter {
-			if m.chipIndex < len(m.statusChips)-1 {
-				m.chipIndex++
-			}
-		} else {
+		if m.focus == focusList {
 			m.focus = focusFilter
 		}
 		return m, nil
+	case "[":
+		if len(m.statusChips) == 0 {
+			return m, nil
+		}
+		if m.chipIndex > 0 {
+			m.chipIndex--
+		} else {
+			m.chipIndex = len(m.statusChips) - 1
+		}
+		m.applyChipFilter()
+		m.setNotice("status filter: "+m.statusChips[m.chipIndex], false)
+		return m, m.refreshCmd()
+	case "]":
+		if len(m.statusChips) == 0 {
+			return m, nil
+		}
+		if m.chipIndex < len(m.statusChips)-1 {
+			m.chipIndex++
+		} else {
+			m.chipIndex = 0
+		}
+		m.applyChipFilter()
+		m.setNotice("status filter: "+m.statusChips[m.chipIndex], false)
+		return m, m.refreshCmd()
 	case "up", "k":
 		if m.focus == focusList && m.selected > 0 {
 			m.selected--
