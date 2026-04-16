@@ -1,0 +1,4 @@
+interface:
+  display_name: "TrainPulse CLI"
+  short_description: "Run and monitor training jobs with TrainPulse"
+  default_prompt: "Use trainpulse commands to run jobs, inspect status/logs, stop runs, and check health/config on this machine."
