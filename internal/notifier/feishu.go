@@ -12,6 +12,49 @@ import (
 	"github.com/trainpulse/trainpulse/internal/runtime"
 )
 
+func toFloat64(v any) (float64, bool) {
+	switch value := v.(type) {
+	case float64:
+		return value, true
+	case float32:
+		return float64(value), true
+	case int:
+		return float64(value), true
+	case int8:
+		return float64(value), true
+	case int16:
+		return float64(value), true
+	case int32:
+		return float64(value), true
+	case int64:
+		return float64(value), true
+	case uint:
+		return float64(value), true
+	case uint8:
+		return float64(value), true
+	case uint16:
+		return float64(value), true
+	case uint32:
+		return float64(value), true
+	case uint64:
+		return float64(value), true
+	default:
+		return 0, false
+	}
+}
+
+func formatDuration(v any) (string, bool) {
+	seconds, ok := toFloat64(v)
+	if !ok || seconds < 0 {
+		return "", false
+	}
+	totalSeconds := int64(seconds + 0.5)
+	hours := totalSeconds / 3600
+	minutes := (totalSeconds % 3600) / 60
+	secs := totalSeconds % 60
+	return fmt.Sprintf("%02d h %02d m %02d s (total %d s)", hours, minutes, secs, totalSeconds), true
+}
+
 type FeishuNotifier struct {
 	WebhookURL     string
 	MessageType    string
@@ -110,7 +153,9 @@ func (n *FeishuNotifier) messageLines(payload map[string]any) []string {
 		lines = append(lines, "🕓 end: "+s)
 	}
 	if d := payload["duration"]; d != nil {
-		lines = append(lines, fmt.Sprintf("⏱️ duration: %vs", d))
+		if formatted, ok := formatDuration(d); ok {
+			lines = append(lines, fmt.Sprintf("⏱️ duration: %s", formatted))
+		}
 	}
 	if ec := payload["exit_code"]; ec != nil {
 		lines = append(lines, fmt.Sprintf("📉 exit_code: %v", ec))

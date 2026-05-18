@@ -8,6 +8,20 @@ The format is inspired by Keep a Changelog and uses semantic versioning.
 
 ### Changed
 
+- N/A
+
+## [0.2.7] - 2026-05-18
+
+### Changed
+
+- `tmux-run` now accepts optional `--session`; when omitted, TrainPulse auto-generates a unique tmux session name.
+- `tmux-run` now keeps the tmux session open only when wrapped command fails, making post-failure log inspection and debugging easier.
+- Notification duration format changed to `XX h XX m XX s (total XXX s)` (rounded total seconds) for both Go and Python notifier paths.
+- Added regression tests for tmux session auto-generation, failure-retention wrapper behavior, and duration formatting.
+- Updated command references/docs to reflect optional `--session` behavior and new troubleshooting guidance.
+
+### Previous Unreleased Notes
+
 - Unified public naming across repo/package/CLI/module to `TrainPulse` / `trainpulse`.
 - Improved Feishu message rendering with event emojis and more structured `post` content.
 - Improved default `text` message readability (multi-line key fields).

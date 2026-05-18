@@ -15,6 +15,20 @@ def _iso_now() -> str:
     return now_iso()
 
 
+def _format_duration(value: object) -> Optional[str]:
+    try:
+        seconds = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if seconds < 0:
+        return None
+    total = int(seconds + 0.5)
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    return f"{hours:02d} h {minutes:02d} m {secs:02d} s (total {total} s)"
+
+
 class FeishuNotifier:
     EVENT_STYLE = {
         "STARTED": ("🚀", "Task Started"),
@@ -78,7 +92,9 @@ class FeishuNotifier:
         if payload.get("exit_code") is not None:
             lines.append(f"📉 exit_code: {payload.get('exit_code')}")
         if payload.get("duration") is not None:
-            lines.append(f"⏱️ duration: {payload.get('duration')}s")
+            formatted = _format_duration(payload.get("duration"))
+            if formatted:
+                lines.append(f"⏱️ duration: {formatted}")
         if payload.get("log_path"):
             lines.append(f"📝 log: {payload.get('log_path')}")
         if payload.get("cmd"):
@@ -111,7 +127,9 @@ class FeishuNotifier:
             if payload.get("end_time"):
                 lines.append([{"tag": "text", "text": f"🕓 end: {payload.get('end_time')}"}])
             if payload.get("duration") is not None:
-                lines.append([{"tag": "text", "text": f"⏱️ duration: {payload.get('duration')}s"}])
+                formatted = _format_duration(payload.get("duration"))
+                if formatted:
+                    lines.append([{"tag": "text", "text": f"⏱️ duration: {formatted}"}])
             if payload.get("exit_code") is not None:
                 lines.append([{"tag": "text", "text": f"📉 exit_code: {payload.get('exit_code')}"}])
             if payload.get("log_path"):

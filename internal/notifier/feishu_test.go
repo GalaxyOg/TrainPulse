@@ -37,7 +37,7 @@ func TestBuildTextEmojiStyle(t *testing.T) {
 		"🌿 git: feat_ffsm_e2e_pipeline@4295d75",
 		"🕒 start: 2026-04-06T11:51:40+00:00",
 		"🕓 end: 2026-04-06T22:18:44+00:00",
-		"⏱️ duration: 37624.071s",
+		"⏱️ duration: 10 h 27 m 04 s (total 37624 s)",
 		"📉 exit_code: 0",
 		"📝 log: /tmp/train.log",
 		"💻 cmd: python train.py",

@@ -33,6 +33,7 @@ class NotifierTests(unittest.TestCase):
         self.assertIn("❌ [FAILED] Task Failed | demo", text)
         self.assertIn("🧩 job: train", text)
         self.assertIn("📉 exit_code: 2", text)
+        self.assertIn("⏱️ duration: 00 h 00 m 01 s (total 1 s)", text)
         self.assertIn("💻 cmd: python train.py", text)
 
     def test_post_message_format(self) -> None:
@@ -45,6 +46,7 @@ class NotifierTests(unittest.TestCase):
         flattened = " ".join(item["text"] for line in content for item in line)
         self.assertIn("📦 project: demo", flattened)
         self.assertIn("📉 exit_code: 2", flattened)
+        self.assertIn("⏱️ duration: 00 h 00 m 01 s (total 1 s)", flattened)
 
     def test_dry_run_send_prints_failed_event(self) -> None:
         notifier = FeishuNotifier(webhook_url=None, message_type="text", dry_run=True)

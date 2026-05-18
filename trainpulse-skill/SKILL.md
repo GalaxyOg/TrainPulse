@@ -25,7 +25,7 @@ Use this skill to run training commands with notification/state tracking and ope
 Foreground mode:
 `trainpulse run -- <command...>`
 Detached tmux mode:
-`trainpulse tmux-run --session <name> --log-path <path> -- <command...>`
+`trainpulse tmux-run [--session <name>] --log-path <path> -- <command...>`
 
 4. Monitor and inspect.
 `trainpulse status`
@@ -40,7 +40,7 @@ Detached tmux mode:
 
 - Always include `--` between TrainPulse flags and the wrapped command.
 - Never invent `run_id`; read it from `trainpulse status` first.
-- For detached mode, require `--session`.
+- For detached mode, `--session` is optional; omit it to auto-generate a session name.
 - Prefer `trainpulse doctor` before blaming webhook or tmux failures.
 - Keep `status` and `logs` near `run/tmux-run` in operational workflows.
 
@@ -55,7 +55,7 @@ trainpulse config check
 trainpulse run -- python train.py --config cfg.yaml
 
 # detached tmux run
-trainpulse tmux-run --session exp1 --log-path ./log/exp1.log -- \
+trainpulse tmux-run --log-path ./log/exp1.log -- \
   python train.py --config cfg.yaml
 
 # observe and control

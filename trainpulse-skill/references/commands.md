@@ -4,7 +4,7 @@
 
 ```bash
 trainpulse run -- <command...>
-trainpulse tmux-run --session <name> --log-path <path> -- <command...>
+trainpulse tmux-run [--session <name>] --log-path <path> -- <command...>
 trainpulse status [--running-only] [--reconcile]
 trainpulse logs [--run-id <run_id>] [--tail N] [--follow]
 trainpulse stop --run-id <run_id>
@@ -31,7 +31,7 @@ trainpulse run -- python train.py --config cfg.yaml
 
 ```bash
 # detached tmux run + monitoring
-trainpulse tmux-run --session exp1 --log-path ./log/exp1.log -- \
+trainpulse tmux-run --log-path ./log/exp1.log -- \
   python train.py --config cfg.yaml
 trainpulse status
 trainpulse logs --tail 200
@@ -61,8 +61,8 @@ trainpulse stop --run-id <run_id>
 
 - `error: missing command, use: trainpulse run -- <command...>`:
 Include `--` before the wrapped command.
-- `error: --session is required`:
-Provide `--session` for `tmux-run`.
+- `error: tmux session already exists: ...`:
+Choose another `--session` or omit it to let TrainPulse auto-generate one.
 - `error: --run-id is required`:
 Read a valid id from `trainpulse status` and retry.
 - Notification issues:

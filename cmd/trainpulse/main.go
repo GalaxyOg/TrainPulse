@@ -162,6 +162,44 @@ func generateRunID() string {
 	return fmt.Sprintf("%s-%s", runtime.NowCompact(), hex.EncodeToString(buf))
 }
 
+func autoTmuxSessionName(runID string) string {
+	return "trainpulse-" + runID
+}
+
+func resolveTmuxSessionName(requested, runID string) (string, error) {
+	return resolveTmuxSessionNameWithChecker(requested, runID, tmux.SessionExists)
+}
+
+func resolveTmuxSessionNameWithChecker(requested, runID string, sessionExists func(string) bool) (string, error) {
+	if sessionExists == nil {
+		sessionExists = tmux.SessionExists
+	}
+	if requested != "" {
+		if sessionExists(requested) {
+			return "", fmt.Errorf("tmux session already exists: %s", requested)
+		}
+		return requested, nil
+	}
+	base := autoTmuxSessionName(runID)
+	if !sessionExists(base) {
+		return base, nil
+	}
+	for i := 1; i <= 1000; i++ {
+		candidate := fmt.Sprintf("%s-%d", base, i)
+		if !sessionExists(candidate) {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("failed to allocate tmux session name from base: %s", base)
+}
+
+func wrapCommandKeepSessionOnFailure(command string) string {
+	return fmt.Sprintf(
+		`%s; tp_exit=$?; if [ "$tp_exit" -ne 0 ]; then echo "[trainpulse] command failed with exit code ${tp_exit}. keeping tmux session for debugging."; exec "${SHELL:-/bin/bash}"; fi; exit "$tp_exit"`,
+		command,
+	)
+}
+
 func normalizeCommandArgs(args []string) []string {
 	if len(args) > 0 && args[0] == "--" {
 		return args[1:]
@@ -236,21 +274,13 @@ func commandTmuxRun(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
 	}
-	if strings.TrimSpace(*session) == "" {
-		fmt.Fprintln(os.Stderr, "error: --session is required")
-		return 2
-	}
 	cmd := normalizeCommandArgs(fs.Args())
 	if len(cmd) == 0 {
-		fmt.Fprintln(os.Stderr, "error: missing command, use: trainpulse tmux-run --session s -- <command...>")
+		fmt.Fprintln(os.Stderr, "error: missing command, use: trainpulse tmux-run [--session s] -- <command...>")
 		return 2
 	}
 	if !tmux.HasTmux() {
 		fmt.Fprintln(os.Stderr, "error: tmux is not installed; use `trainpulse run` instead.")
-		return 2
-	}
-	if tmux.SessionExists(*session) {
-		fmt.Fprintf(os.Stderr, "error: tmux session already exists: %s\n", *session)
 		return 2
 	}
 	rt, err := config.ResolveRuntime(runtimeInputFromFlags(rf))
@@ -259,6 +289,11 @@ func commandTmuxRun(args []string) int {
 		return 2
 	}
 	rid := generateRunID()
+	sessionName, err := resolveTmuxSessionName(strings.TrimSpace(*session), rid)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 2
+	}
 	exePath, _ := os.Executable()
 	inner := []string{exePath, "run", "--run-id", rid, "--config", rf.configPath, "--store-path", rt.StorePath, "--message-type", rt.MessageType, "--error-log-path", rt.ErrorLogPath}
 	if *jobName != "" {
@@ -285,16 +320,18 @@ func commandTmuxRun(args []string) int {
 	inner = append(inner, cmd...)
 
 	commandStr := ctxpkg.JoinCommand(inner)
-	wrapped := fmt.Sprintf("TRAINPULSE_TMUX_SESSION=%s %s", shellQuote(*session), commandStr)
+	wrappedInner := fmt.Sprintf("TRAINPULSE_TMUX_SESSION=%s %s", shellQuote(sessionName), commandStr)
+	wrapped := wrapCommandKeepSessionOnFailure(wrappedInner)
 	targetCWD := *cwd
 	if strings.TrimSpace(targetCWD) == "" {
 		targetCWD, _ = os.Getwd()
 	}
-	if err := tmux.StartDetachedSession(*session, wrapped, targetCWD); err != nil {
+	if err := tmux.StartDetachedSession(sessionName, wrapped, targetCWD); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
 	}
-	fmt.Printf("tmux task started: run_id=%s session=%s\n", rid, *session)
+	fmt.Printf("tmux task started: run_id=%s session=%s\n", rid, sessionName)
+	fmt.Printf("attach: tmux attach -t %s\n", sessionName)
 	return 0
 }
 

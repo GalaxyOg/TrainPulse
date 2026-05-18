@@ -234,6 +234,36 @@ def _generate_run_id() -> str:
     return f"{ts}-{suffix}"
 
 
+def _auto_tmux_session_name(run_id: str) -> str:
+    return f"trainpulse-{run_id}"
+
+
+def _resolve_tmux_session_name(requested: Optional[str], run_id: str) -> str:
+    preferred = (requested or "").strip()
+    if preferred:
+        if session_exists(preferred):
+            raise RuntimeError(f"tmux session already exists: {preferred}")
+        return preferred
+    base = _auto_tmux_session_name(run_id)
+    if not session_exists(base):
+        return base
+    for idx in range(1, 1001):
+        candidate = f"{base}-{idx}"
+        if not session_exists(candidate):
+            return candidate
+    raise RuntimeError(f"failed to allocate tmux session name from base: {base}")
+
+
+def _wrap_command_keep_session_on_failure(command: str) -> str:
+    return (
+        f'{command}; tp_exit=$?; '
+        'if [ "$tp_exit" -ne 0 ]; then '
+        'echo "[trainpulse] command failed with exit code ${tp_exit}. keeping tmux session for debugging."; '
+        'exec "${SHELL:-/bin/bash}"; '
+        'fi; exit "$tp_exit"'
+    )
+
+
 def _parse_iso(value: Any) -> Optional[datetime]:
     if not isinstance(value, str) or not value:
         return None
@@ -385,16 +415,18 @@ def cmd_tmux_run(args: argparse.Namespace) -> int:
     runtime = _resolve_runtime(args)
     command = _normalize_cmd(args.cmd)
     if not command:
-        print("error: missing command, use: trainpulse tmux-run --session s -- <command...>", file=sys.stderr)
+        print("error: missing command, use: trainpulse tmux-run [--session s] -- <command...>", file=sys.stderr)
         return 2
     if not has_tmux():
         print("error: tmux is not installed; use `trainpulse run` instead.", file=sys.stderr)
         return 2
-    if session_exists(args.session):
-        print(f"error: tmux session already exists: {args.session}", file=sys.stderr)
-        return 2
 
     run_id = _generate_run_id()
+    try:
+        session_name = _resolve_tmux_session_name(args.session, run_id)
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     inner = [
         sys.executable,
         "-m",
@@ -426,9 +458,11 @@ def cmd_tmux_run(args: argparse.Namespace) -> int:
     inner += ["--", *command]
 
     command_str = shlex.join(inner)
-    wrapped_command = f"TRAINPULSE_TMUX_SESSION={shlex.quote(args.session)} {command_str}"
-    start_detached_session(args.session, wrapped_command, cwd=args.cwd)
-    print(f"tmux task started: run_id={run_id} session={args.session}")
+    wrapped_inner = f"TRAINPULSE_TMUX_SESSION={shlex.quote(session_name)} {command_str}"
+    wrapped_command = _wrap_command_keep_session_on_failure(wrapped_inner)
+    start_detached_session(session_name, wrapped_command, cwd=args.cwd)
+    print(f"tmux task started: run_id={run_id} session={session_name}")
+    print(f"attach: tmux attach -t {session_name}")
     return 0
 
 
@@ -543,7 +577,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     tmux_p = sub.add_parser("tmux-run", help="Run command in detached tmux session with alerts")
     add_runtime_flags(tmux_p)
-    tmux_p.add_argument("--session", required=True)
+    tmux_p.add_argument("--session", default=None)
     tmux_p.add_argument("--job-name", default=None)
     tmux_p.add_argument("--log-path", default=None)
     tmux_p.add_argument("--cwd", default=os.getcwd())
